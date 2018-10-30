@@ -1,0 +1,17 @@
+# Introduction to Generalized Linear Models
+
+## Generalized Linear Models
+
+Ordinary regression models try to find the best fit for mean response, where the response observations have i.i.d. Normal distribution and linear systematic part. We can extend this model to explain various types of variables such as count data with poisson distribution and probability with binomial distribution, et cetera. We name this model as _Generalized linear models_ (GLMs). They have three components:
+
+1. A _random component_: the response variable $Y$ has specific probability distribution
+2. A _systematic compoenet_: the explanatrory variables form a linear predictor function
+3. A _link function_: a link $g$ describes the relationship between the systematic component and expected value of the random component
+
+In sum, we can have a form of
+
+$$\eta_i = g(\mu_i) = \sum_j \beta_j x_{ij} \quad i = 1, 2, \ldots, N$$
+
+
+
+

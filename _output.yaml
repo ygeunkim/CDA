@@ -1,0 +1,16 @@
+bookdown::gitbook:
+  config:
+    toc:
+      collapse: section
+      before: |
+        <li><strong><a href="./">R Lab for Cateogorical Data Analysis</a></strong></li>
+    edit:
+      link: https://github.com/ygeunkim/CDA/edit/master/%s
+      text: "Edit"
+    sharing: no
+  css:
+
+bookdown::pdf_book:
+  latex_engine: "xelatex"
+  citation_package: natbib
+  pandoc_args: --top-level-division=chapter

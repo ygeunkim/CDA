@@ -1,0 +1,48 @@
+# Introduction: Distributions and Inference for Categorical Data
+
+## Categorical Response Data
+
+There are various ways of classifications of variables.
+
+- Response vs Explanatory
+- Measurement scale
+    - nominal variable: unordered categories
+    - ordinal variable: ordered categories
+    - interval variable: numerical distances between levels
+- Continuous vs Discrete
+- Qualitative vs Quantitative
+    - nominal variable is *qualitative*
+    - interval variable is *quantative*
+    - ordinal variable is *?*
+
+Here we deal with **categorical response** data, i.e. response of which measurement scale consisting of a set of categories.
+
+## Distributions for Categorical Data
+
+### Binomial distribution
+
+### Multinomial distribution
+
+### Poisson distribution
+
+### Overdispersion
+
+## Statistical Inference for Categorical Data
+
+### Maximum likelihood estimation
+
+*Maximum likelihood estimation* is mainly used for parameter estimation.
+
+### Likelihood function and MLE for Binomial parameter
+
+\begin{equation}
+\begin{split}
+L(\pi) & = \ln l(\pi) \\
+& \propto \ln[\pi^y(1 - \pi)^(n - y)] \\
+& = y\ln\pi + (n - y)\ln(1 - \pi)
+\end{split}
+\end{equation}
+
+
+
+
