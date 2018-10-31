@@ -194,7 +194,7 @@ probit_fit <-
 from @Agresti:2007aa
 
 ```{r, message=FALSE}
-(remission <- read_table("data/remission.txt") %>% na.omit())
+(remission <- read_table("data/remission.dat") %>% na.omit())
 remission <-
   remission %>%
   mutate_if(is.character, as.numeric)
