@@ -8,8 +8,9 @@ bookdown::gitbook:
       link: https://github.com/ygeunkim/CDA/edit/master/%s
       text: "Edit"
     sharing: no
-  css:
-
+  css: cda.css
+bookdown::html_chapters:
+  css: cda.css
 bookdown::pdf_book:
   latex_engine: "xelatex"
   citation_package: natbib

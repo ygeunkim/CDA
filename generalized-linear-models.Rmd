@@ -1,16 +1,238 @@
+```{r, include=FALSE}
+library(tidyverse)
+```
+
 # Introduction to Generalized Linear Models
 
 ## Generalized Linear Models
 
 Ordinary regression models try to find the best fit for mean response, where the response observations have i.i.d. Normal distribution and linear systematic part. We can extend this model to explain various types of variables such as count data with poisson distribution and probability with binomial distribution, et cetera. We name this model as _Generalized linear models_ (GLMs). They have three components:
 
-1. A _random component_: the response variable $Y$ has specific probability distribution
+1. A _random component_: the response variable $Y$ from natural exponential family
 2. A _systematic compoenet_: the explanatrory variables form a linear predictor function
-3. A _link function_: a link $g$ describes the relationship between the systematic component and expected value of the random component
+3. A _link function_: a link $g$ describes the relationship between the systematic component and expected value of the random component, where $g$ is monotonic and differentiable function
 
 In sum, we can have a form of
 
-$$\eta_i = g(\mu_i) = \sum_j \beta_j x_{ij} \quad i = 1, 2, \ldots, N$$
+$$\boldsymbol{\eta} = g(\boldsymbol{\mu}) = X\boldsymbol{\beta}$$
+
+where $X$ is a sample data matrix.
+
+### Link functions
+
+For a given response variable, what link function should we use? Any _monotone differentiable_ function can be used as link function. For example, we have used _identity link_ for Gaussian response data. log-link might be applied to count data of _Poisson distribution_ that have positive support. However, among many link functions, so-called **canonical links** are used practically.
+
+### Exponential family
+
+In GLMs, random component is assumed to be from _natrual exponential family_, whose density or mass function is defined by
+
+\begin{equation}
+f(y_i ; \theta_i) := a(\theta_i)b(y_i)\exp[y_iQ(\theta_i)], \quad i = 1, 2, \ldots, N
+\end{equation}
+
+Here $Q(\theta)$ is called the _natural parameter_.
+
+### Binomial logit models for binary data
+
+### Poisson loglinear models for count data
+
+### Generalized linear models for continuous responses
+
+### Deviance
+
+## GLMs for Binary data
+
+Let $Y$ be a binary response variable.
+
+$$Y = \begin{cases} 1 & \text{if success} \\ 0 & \text{if failure} \end{cases}$$
+
+Then
+
+$$Y_i \stackrel{indep}{\sim} Bernoulli(\pi(x_i))$$
+
+The mean and variance of $Y$ are
+
+$$E(Y) = P(Y = 1) = \pi(\mathbf{x})$$
+
+$$Var(Y) = \pi(x)(1 - \pi(\mathbf{x}))$$
+
+### Linear probability model
+
+### Logistic regression model
+
+### snoring and heart disease data
+
+from @Agresti:2012aa
+
+```{r}
+(heart <-
+  tribble(
+    ~snoring, ~yes, ~no,
+    "never", 24, 1355,
+    "occasional", 35, 603,
+    "nearly_every_night", 21, 192,
+    "every_night", 30, 224
+  ) %>%
+  gather(-snoring, key = "disease", value = "freq"))
+```
+
+```{r}
+snoring_score <- function(x) {
+  if (x == "never") {
+    x = 0
+  } else if (x == "occasional") {
+    x = 2
+  } else if (x == "nearly_every_night") {
+    x = 4
+  } else {
+    x = 5
+  }
+  x
+}
+
+(heart <-
+  heart %>%
+  rowwise() %>%
+  mutate(snoring = snoring_score(snoring)))
+```
+
+```{r}
+heart_crosstab <-
+   heart %>%
+   xtabs(freq ~ snoring + disease, data = .)
+addmargins(heart_crosstab, margin = 2)
+```
+
+
+We now fit probabilities
+
+$$\pi(\mathbf{x}) = P(Y = \text{yes})$$
+
+
+```{r}
+(row_prop <- prop.table(heart_crosstab, margin = 1))
+```
+
+```{r}
+(heart_prop <-
+  heart %>%
+  group_by(snoring) %>%
+  mutate(row_margin = sum(freq), prop_yes = freq / row_margin))
+```
+
+
+### Linear probability model
+
+```{r}
+heart_prop %>%
+  filter(disease == "yes") %>%
+  ggplot(aes(factor(snoring), prop_yes)) +
+  geom_boxplot()
+```
+
+- `xtabs` version:
+
+```{r}
+addmargins(heart_crosstab, margin = 2) %>%
+  as.data.frame.matrix() %>%
+  rownames_to_column(var = "snoring") %>%
+  mutate(snoring = as.numeric(snoring)) %>%
+  glm(yes/Sum ~ snoring, weights = Sum, family = gaussian(link = "identity"), data = .) %>%
+  summary()
+```
+
+- `tibble` version:
+
+```{r}
+(linprob_fit <-
+  heart_prop %>%
+  filter(disease == "yes") %>%
+  glm(prop_yes ~ snoring, family = gaussian(link = "identity"), data = ., weights = row_margin) %>%
+  summary())
+```
+
+
+### Logistic regression model
+
+
+```{r}
+addmargins(heart_crosstab, margin = 2) %>%
+  as.data.frame.matrix() %>%
+  rownames_to_column(var = "snoring") %>%
+  mutate(snoring = as.numeric(snoring)) %>%
+  glm(yes/Sum ~ snoring, weights = Sum, family = binomial(link = "logit"), data = .) %>%
+  summary()
+
+logistc_fit <-
+  heart_prop %>%
+  filter(disease == "yes") %>%
+  glm(prop_yes ~ snoring, family = binomial(link = "logit"), data = ., weights = row_margin) %>%
+  summary()
+```
+
+
+### Probit model
+
+```{r}
+addmargins(heart_crosstab, margin = 2) %>%
+  as.data.frame.matrix() %>%
+  rownames_to_column(var = "snoring") %>%
+  mutate(snoring = as.numeric(snoring)) %>%
+  glm(yes/Sum ~ snoring, weights = Sum, family = binomial(link = "probit"), data = .) %>%
+  summary()
+
+probit_fit <-
+  heart_prop %>%
+  filter(disease == "yes") %>%
+  glm(prop_yes ~ snoring, family = binomial(link = "probit"), data = ., weights = row_margin) %>%
+  summary()
+```
+
+
+### data on cancer remission
+
+from @Agresti:2007aa
+
+```{r, message=FALSE}
+(remission <- read_table("data/remission.txt") %>% na.omit())
+```
+
+- `LI`: labeling index
+    - proliferative activity of cells
+    - after injection of tritiated thymidine
+    - _percentage of cells that are labeled_
+- `cases`: the number of cases
+- `remissions`: the number of remissions
+
+> We want to _determine the characteristics associated with remission in cancer patients_
+
+$$Y = \begin{cases} 1 & \text{if remission}\: > 0 \\ 0 & \text{if remission}\: = 0 \end{cases}$$
+
+Denote that each row is observed `cases` times.
+
+```{r}
+(remission <-
+  remission %>%
+  mutate(improve = ifelse(remissions > 0, 1, 0)) %>%
+  uncount(cases) %>% # each row = observed cases times
+  select(LI, improve))
+```
+
+
+
+```{r}
+(remission_fit <-
+  remission %>%
+  glm(improve ~ LI, family = binomial(link = "logit"), data = .))
+```
+
+
+```{r}
+data.frame(LI = c(8, 26)) %>%
+  predict(remission_fit, newdata = ., type = "response")
+```
+
+
 
 
 
