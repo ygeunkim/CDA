@@ -1,0 +1,66 @@
+```{r, include=FALSE}
+library(tidyverse)
+```
+
+# Generalized Linear Models for Counts and Rates
+
+It is natural to assume the count data
+
+$$Y \sim Poisson(\mu)$$
+
+## Poisson Loglinear Models
+
+As mentioned, we build a GLM with
+
+1. The _random component_: $Y \sim Poisson(\mu)$
+2. The _systematic component_: $\alpha + \beta_1 x_1 + \cdots + \beta_p x_p$
+3. The _link function_: log-link $\ln(\mu)$ which is canonical link for a Poisson GLM
+
+$$\ln\mu(\mathbf{x}) = \alpha + \beta_1x_1 + \cdots + \beta_px_p$$
+
+For an interpretation perspective,
+
+$$\mu(\mathbf{x}) = \exp(\alpha + \beta_1x_1 + \cdots + \beta_px_p) = e^\alpha(e^{\beta_1})^{x_1}\cdots(e^{\beta_p})^{x_p}$$
+
+i.e. $\mu$ is multiplied by $e^{\beta_j}$ as $x_j$ increases by 1-unit. $x_j$ has a _multiplicative impact_ of $e^{\beta_j}$ on $\mu$.
+
+
+## Horseshoe crab mating data
+
+```{r, message=FALSE}
+(crab <- read_table("data/Crabs.dat"))
+```
+
+```{r}
+crab %>%
+  ggplot() +
+  aes(x = width, y = sat) +
+  geom_hex() +
+  labs(
+    x = "Carapace width",
+    y = "Number of satellites"
+  )
+```
+
+- Large variability is observed.
+- Outlier: analysis with this observation and without it
+
+For clarification,
+
+```{r}
+crab %>%
+  group_by(width = cut_interval(width, n = 8))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

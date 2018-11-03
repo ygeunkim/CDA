@@ -123,13 +123,6 @@ $$\pi(\mathbf{x}) = P(Y = \text{yes})$$
 
 ### Linear probability model
 
-```{r}
-heart_prop %>%
-  filter(disease == "yes") %>%
-  ggplot(aes(factor(snoring), prop_yes)) +
-  geom_boxplot()
-```
-
 - `xtabs` version:
 
 ```{r}
@@ -151,7 +144,6 @@ addmargins(heart_crosstab, margin = 2) %>%
   summary())
 ```
 
-
 ### Logistic regression model
 
 
@@ -170,7 +162,6 @@ logistc_fit <-
   summary()
 ```
 
-
 ### Probit model
 
 ```{r}
@@ -187,7 +178,6 @@ probit_fit <-
   glm(prop_yes ~ snoring, family = binomial(link = "probit"), data = ., weights = row_margin) %>%
   summary()
 ```
-
 
 ### data on cancer remission
 
@@ -214,17 +204,10 @@ $$Y = \begin{cases} 1 & \text{if remission}\: > 0 \\ 0 & \text{if remission}\: =
 Denote that each row is observed `cases` times.
 
 ```{r}
-(remission_case <-
-  remission %>%
-  mutate(improve = ifelse(remissions > 0, 1, 0)) %>%
-  uncount(cases) %>% # each row = observed cases times
-  select(LI, improve))
-```
-
-```{r}
 (remission_fit <-
-  remission_case %>%
-  glm(improve ~ LI, family = binomial(link = "logit"), data = .))
+  remission %>%
+  glm(remissions/cases ~ LI, family = binomial(link = "logit"), data = ., weights = cases) %>%
+  summary())
 ```
 
 
@@ -233,11 +216,57 @@ data.frame(LI = c(8, 26)) %>%
   predict(remission_fit, newdata = ., type = "response")
 ```
 
+### `remission` raw data
 
 ```{r}
-remission %>%
-  glm(remissions/cases ~ LI, family = binomial(link = "logit"), data = ., weights = cases)
+remission_raw <-
+  tribble(
+    ~LI, ~remissions,
+    8, 0,
+    8, 0,
+    10, 0,
+    10, 0,
+    12, 0,
+    12, 0,
+    12, 0,
+    14, 0,
+    14, 0,
+    14, 0,
+    16, 0,
+    16, 0,
+    16, 0,
+    18, 1,
+    20, 0,
+    20, 1,
+    20, 1,
+    22, 0,
+    22, 1,
+    24, 0,
+    26, 1,
+    28, 1,
+    32, 0,
+    34, 1,
+    38, 0,
+    38, 1,
+    38, 1
+  )
 ```
+
+We can make `remission`:
+
+```{r}
+remission_raw %>%
+  group_by(LI) %>%
+  summarise(cases = n(), remissions = sum(remissions))
+```
+
+Thus, `glm` for `remissions ~ LI` for this raw data set gives the same result.
+
+```{r}
+glm(remissions ~ LI, family = binomial(link = "logit"), data = remission_raw)
+```
+
+
 
 
 
