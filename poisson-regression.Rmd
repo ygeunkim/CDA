@@ -70,6 +70,67 @@ crab %>%
   geom_boxplot(show.legend = FALSE)
 ```
 
+### Logistic regression model
+
+$$Y = \begin{cases} 1 & \text{if satellite}\: > 0 \\ 0 & \text{if satellite}\: = 0 \end{cases}$$
+
+```{r}
+crab %>%
+  select(y, width)
+```
+
+
+```{r}
+logistic_fit <-
+  crab %>%
+  glm(y ~ width, data = ., family = binomial(link = "logit"))
+summary(logistic_fit)
+```
+
+
+```{r}
+anova(logistic_fit, test = "LRT")
+```
+
+
+
+### Poisson regression
+
+```{r}
+crab %>%
+  select(sat, width)
+```
+
+
+```{r}
+pois_fit <-
+ crab %>%
+  glm(sat ~ width, data = ., family = poisson(link = "log"))
+summary(pois_fit)
+```
+
+
+```{r}
+anova(pois_fit, test = "LRT")
+```
+
+
+### Overdispersion
+
+```{r}
+width_interval
+```
+
+`Variance` is much larger than `Mean`.
+
+
+### Negative Binomial GLMs
+
+
+
+
+
+
 
 
 
