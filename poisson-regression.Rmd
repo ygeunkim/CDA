@@ -172,18 +172,35 @@ $$r_i = \frac{y_i - \hat\mu_i}{\sqrt{V(\hat\mu_i)(1 - \hat{h}_i)}} = \frac{e_i}{
 where $\hat{h}_i$ is the hat values.
 
 ```{r}
-pois_resid <- residuals(pois_fit) / sqrt(1 - hatvalues(pois_fit))
-summary(pois_resid)
+pois_resid <- rstandard(pois_fit, type = "pearson")
+tibble(pois_resid) %>%
+  ggplot(aes(y = pois_resid)) +
+  geom_boxplot() +
+  coord_flip()
+```
+
+Three large residuals can be observed.
+
+```{r}
+tibble(pois_resid) %>%
+  ggplot() +
+  aes(sample = pois_resid) +
+  geom_qq_line(col = "grey", size = 1.5) +
+  geom_qq()
 ```
 
 ```{r}
-autoplot(pois_fit)
+data_frame(pred = predict(pois_fit, type = "response"),
+         resid = pois_resid) %>%
+  ggplot() +
+  aes(pred, resid) +
+  geom_hline(yintercept = 0, alpha = .5) +
+  geom_jitter() +
+  geom_vline(xintercept = 5, col = "red") +
+  geom_hline(yintercept = 5, col = "red")
 ```
 
-- Three large residuals can be observed.
-- The set of $r_i$ seems variable.
-
-It cannot be said to be a good fit.
+The set of $r_i$ seems variable. It cannot be said to be a good fit.
 
 ### Overdispersion for Poisson GLMs
 
@@ -226,9 +243,76 @@ Negative binomial distribution which also takes into account count response can 
 
 $$E(Y) = \mu \quad < Var(Y) = \mu + \gamma\mu^2$$
 
-Here, $\gamma > 0$ is called _dispersion parameter_. `MASS` library enables to fit the negative binomial random component and corresponding link functions.
+Here, $\gamma > 0$ is called _dispersion parameter_. `MASS` library enables to fit the negative binomial random component and corresponding link functions. There are two ways to fit this random component.
+
+- `MASS::glm.nb()` itself performs what we want, by default `link = log`
+    - link function must be specified among: `log`, `sqrt`, or `identity`
+    - `init.theta` = dispersion parameter is optional: if omitted, moment estimator by Poisson GLM is used
+- Specify `family` option by `MASS::negative.binomial(theta, link)` of base `glm()`
+    - _dispersion parameter_ `theta` must be chosen
+
+```{r}
+crab %>%
+  MASS::glm.nb(sat ~ width, data = .,
+               link = identity,
+               mustart = predict(pois_fit, type = "response"))
+```
 
 
+```{r}
+crab %>%
+  glm(sat ~ width, data = .,
+      family = MASS::negative.binomial(theta = .9, link = "identity"),
+      start = coef(pois_fit))
+```
+
+We now implement `log` link which is more typically used.
+
+```{r}
+neg_fit <-
+  crab %>%
+  glm(sat ~ width, data = .,
+      family = MASS::negative.binomial(theta = .9, link = "log"))
+summary(neg_fit)
+```
+
+```{r}
+anova(neg_fit, test = "LRT")
+```
+
+Residual deviance is much smaller than poisson regression.
+
+```{r}
+neg_resid <- rstandard(neg_fit, type = "pearson")
+tibble(neg_resid) %>%
+  ggplot(aes(y = neg_resid)) +
+  geom_boxplot() +
+  coord_flip()
+```
+
+Standardized residuals are not large.
+
+```{r}
+tibble(neg_resid) %>%
+  ggplot() +
+  aes(sample = neg_resid) +
+  geom_qq_line(col = "grey", size = 1.5) +
+  geom_qq()
+```
+
+
+```{r}
+data_frame(pred = predict(neg_fit, type = "response"),
+         resid = neg_resid) %>%
+  ggplot() +
+  aes(pred, resid) +
+  geom_hline(yintercept = 0, alpha = .5) +
+  geom_jitter() +
+  geom_vline(xintercept = 5, col = "red") +
+  geom_hline(yintercept = 3, col = "red")
+```
+
+Compared to the poisson regression model, this model results in less variable residuals.
 
 
 
