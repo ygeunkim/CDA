@@ -48,9 +48,29 @@ crab %>%
 For clarification,
 
 ```{r}
-crab %>%
-  group_by(width = cut_interval(width, n = 8))
+(width_interval <-
+  crab %>%
+  group_by(width = cut(width,
+                       breaks = c(0, seq(23.25, 29.25, by = 1), Inf),
+                       ordered_result = TRUE)) %>%
+  summarise(cases = n(), S = sum(sat), Mean = mean(sat), Variance = var(sat)))
 ```
+
+Looking at the table, we can see the _nonlinear relationship_ between sateliite counts and width.
+
+
+
+```{r}
+crab %>%
+  group_by(width = cut(width,
+                       breaks = c(0, seq(23.25, 29.25, by = 1), Inf),
+                       ordered_result = TRUE)) %>%
+  ggplot() +
+  aes(x = width, y = sat, fill = width) +
+  geom_boxplot(show.legend = FALSE)
+```
+
+
 
 
 
