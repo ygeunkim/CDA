@@ -1,5 +1,6 @@
 ```{r, include=FALSE}
 library(tidyverse)
+library(ggfortify)
 ```
 
 # Generalized Linear Models for Counts and Rates
@@ -72,6 +73,8 @@ crab %>%
 
 ### Logistic regression model
 
+Consider binary response
+
 $$Y = \begin{cases} 1 & \text{if satellite}\: > 0 \\ 0 & \text{if satellite}\: = 0 \end{cases}$$
 
 ```{r}
@@ -79,22 +82,26 @@ crab %>%
   select(y, width)
 ```
 
+For $\pi(x) = P(Y = 1) = \mu$,
+
+$$\text{logit}\pi(x) \equiv \ln\frac{\pi(x)}{1 - \pi(x)} = \alpha + \beta x$$
 
 ```{r}
 logistic_fit <-
   crab %>%
-  glm(y ~ width, data = ., family = binomial(link = "logit"))
+  glm(y ~ width, family = binomial(link = "logit"), data = .)
 summary(logistic_fit)
 ```
 
+Estimated odds of having satellites for each unit change in `width` is multiplied by
 
-```{r}
-anova(logistic_fit, test = "LRT")
-```
-
-
+$$\frac{\hat\pi}{1 - \hat\pi} = \exp(\hat\beta) = 1.64$$
 
 ### Poisson regression
+
+Consider count response
+
+$$Y = \text{the number of satellites} \sim Poisson(\mu)$$
 
 ```{r}
 crab %>%
@@ -109,23 +116,117 @@ pois_fit <-
 summary(pois_fit)
 ```
 
+### Goodness-of-fit
+
+Deviance of _exponential family_ can be given by
+
+\begin{equation}
+\begin{split}
+D(\mathbf{y}, \boldsymbol{\hat\mu}) & := -2(L_M - L_S) \\
+& = LRT \quad\text{for}\: H_0: M \\
+& = 2\sum_i\frac{y_i\tilde\theta_i - b(\tilde\theta_i)}{a(\phi)} - 2\sum_i\frac{y_i\hat\theta_i - b(\hat\theta_i)}{a(\phi)} \\
+& \text{where}\quad \tilde\theta = \text{of saturated, and} \quad \hat\theta = \text{of the current model}
+\end{split}
+\end{equation}
+
+For $a(\phi) = \frac{\phi}{w_i}$, we compute _scaled deviance_
+
+$$\frac{D(\mathbf{y}, \boldsymbol{\hat\mu)}}{\phi} \approx \chi^2$$
+
+It can be simplified in the Poisson GLM as
+
+$$D(\mathbf{y}, \boldsymbol{\hat\mu}) = 2\sum_i\ln\frac{y_i}{\hat\mu_i}$$
+
+To measure the goodness-of-fit, **analysis of deviance** can be conducted. Comparing two nested models with $\phi = 1$, construct a test
+
+$$M_0: \text{simpler model} \qquad\text{vs}\quad M_1: \text{complex model}$$
+
+where $M_0$ is _nested within_ $M_1$. For each model, we can obtain scaled deviance written as
+
+$$D_0 \equiv D(\mathbf{y}, \boldsymbol{\hat\mu_0}) \le D(\mathbf{y}, \boldsymbol{\hat\mu_1}) \equiv D_1$$
+
+Then _likelihood-ratio-test statistic_ is applicable to the above test structure
+
+$$G^2(M_0 \mid M_1) = D_0 - D_1 \stackrel{H_0}{\approx} \chi^2(\text{difference of parameters})$$
+
+In case of canonical link GLMs,
+
+$$G^2(M_0 \mid M_1) = 2\sum_i\hat\mu_{1i}\ln\frac{\hat\mu_{1i}}{\hat\mu_{0i}}$$
 
 ```{r}
 anova(pois_fit, test = "LRT")
 ```
 
+Here,
 
-### Overdispersion
+$$M_0: \text{null model} \qquad\text{vs}\quad M_1: \text{only width}$$
+
+For this hypothesis, reject $M_0$, i.e. the fit of null model is poor compared to the current model. However, the size of residual deviance seems quite large while its degrees of freedom is only `1`.
+
+### Residual analysis
+
+We now examine residual analysis. In general, _standardized Pearson residual_ is prefered.
+
+$$r_i = \frac{y_i - \hat\mu_i}{\sqrt{V(\hat\mu_i)(1 - \hat{h}_i)}} = \frac{e_i}{\sqrt{V(\hat\mu_i)(1 - \hat{h}_i)}}$$
+
+where $\hat{h}_i$ is the hat values.
+
+```{r}
+pois_resid <- residuals(pois_fit) / sqrt(1 - hatvalues(pois_fit))
+summary(pois_resid)
+```
+
+```{r}
+autoplot(pois_fit)
+```
+
+- Three large residuals can be observed.
+- The set of $r_i$ seems variable.
+
+It cannot be said to be a good fit.
+
+### Overdispersion for Poisson GLMs
 
 ```{r}
 width_interval
 ```
 
-`Variance` is much larger than `Mean`.
 
+Theoretically, for Poisson distribution,
+
+$$E(Y) = Var(Y) = \mu$$
+
+However as we can see, sample variance(`Variance`) is much larger than sample mean(`Mean`). In this data set, `width` is not the only predictor that affects the response. Not only that, but also `weight`, `color`, and `spine` can be in the systematic component. Thus, $\mu$ is varied for each combination of $(\text{width, weight, color, spine})^T = \mathbf{x}$. We now have _conditional distribution_
+
+$$Y \mid \mu \sim Poisson(\mu)$$
+
+which gives
+
+$$E(Y \mid \mu) = Var(Y \mid \mu) = \mu$$
+
+Let
+
+$$\theta := E(\mu)$$
+
+Then
+
+$$E(Y) = E\big[E(Y \mid \mu)\big] = E(\mu) = \theta$$
+
+and
+
+$$Var(Y) = E\big[ Var(Y \mid \mu) \big] + Var\big[ E(Y \mid \mu) \big] = E(\mu) + Var(\mu) > \theta$$
+
+Hence,
+
+$$Var(Y) > E(Y)$$
 
 ### Negative Binomial GLMs
 
+Negative binomial distribution which also takes into account count response can be a good candidates. Let $Y$ be the negative binomial random variable with parameters $\mu$ and $\gamma = \frac{1}{k}$. Then
+
+$$E(Y) = \mu \quad < Var(Y) = \mu + \gamma\mu^2$$
+
+Here, $\gamma > 0$ is called _dispersion parameter_. `MASS` library enables to fit the negative binomial random component and corresponding link functions.
 
 
 
