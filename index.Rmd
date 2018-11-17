@@ -17,6 +17,7 @@ header-includes:
 - \setlength{\parskip}{1em}
 - \setlength{\baselineskip}{1ex}
 - \usepackage{multirow}
+- \usepackage{float}
 ---
 
 # Categorical Data Analysis {-}
