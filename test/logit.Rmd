@@ -1,0 +1,52 @@
+---
+title: "logit"
+author: |
+  | Young-geun Kim
+  | Department of Statistics, Sungkyunkwan university
+  | \href{mailto: dudrms33@g.skku.edu}{dudrms33@g.skku.edu}
+date: "`r format(Sys.time(), '%d %b, %Y')`"
+output: pdf_document
+numbersections: yes
+indent: yes
+header-includes:
+- \setlength{\parskip}{1em}
+- \setlength{\baselineskip}{1ex}
+- \usepackage{multirow}
+- \usepackage{xcolor}
+- \usepackage{float}
+---
+
+```{r}
+knitr::opts_chunk$set(
+  comment = NA,
+  out.width = "70%",
+  fig.align = "center",
+  fig.width = 6,
+  fig.asp = .618,
+  fig.pos = "H"
+  )
+```
+
+```{r, message=FALSE}
+library(tidyverse)
+```
+
+```{r, message=FALSE}
+aids <- read_table("../data/AIDS.dat")
+```
+
+```{r, echo=FALSE, results='asis'}
+knitr::kable(aids %>% group_by(race), format = "latex", row.names = FALSE, booktabs = TRUE) %>% 
+  kableExtra::kable_styling(latex_options = "striped") %>% 
+  kableExtra::add_header_above(header = c(" ", " ", "Symptoms" = 2)) %>% 
+  kableExtra::collapse_rows(columns = 1)
+```
+
+
+| |$x_1$|$x_2$|$\cdots$|$x_{I-1}$|  
+|:---:|:---:|:---:|:---:|:---:|  
+|1|1|0|$\cdots$|0|  
+|2|0|1|$\cdots$|0|  
+|$\cdots$|$\cdots$|$\cdots$|$\cdots$|$\cdots$|  
+|I-1|0|0|$\cdots$|1|  
+|I|0|0|$\cdots$|0|  

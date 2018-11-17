@@ -1,0 +1,305 @@
+```{r, include=FALSE}
+library(tidyverse)
+```
+
+# Logit Model for Qualitative Predictors
+
+```{r, message=FALSE}
+aids <- read_table("data/AIDS.dat")
+```
+
+<!-- change to format = latex before compiling -->
+
+```{r, echo=FALSE, results='asis'}
+knitr::kable(aids %>% group_by(race), format = "html", row.names = FALSE, booktabs = TRUE,
+             col.names = c("Race", "AZT Use", "Yes", "No")) %>% 
+  kableExtra::kable_styling(latex_options = "striped") %>% 
+  kableExtra::add_header_above(header = c(" ", " ", "Symptoms" = 2)) %>% 
+  kableExtra::collapse_rows(columns = 1)
+```
+
+$$Y = \text{symptoms} = \begin{cases} \text{yes} \\ \text{no} \end{cases}$$
+
+Here, our main interest is whether the usage of AZT(`azt`) would affect this binary response. Denote that the `azt` is also categorical predictor.
+
+$$X = \text{AZT} = \begin{cases} \text{yes} \\ \text{no} \end{cases}$$
+
+There is another factor `race` that has possibility to be covariate.
+
+$$Z = \text{Race} = \begin{cases} \text{White} \\ \text{Black} \end{cases}$$
+
+Based on the interest, we need to control the effect of this covariate.
+
+## ANOVA-Type Representation of Factors
+
+### One-way ANOVA representation
+
+First consider a signle factor case, with $I$ categories(here, $I = 2$).
+
+```{r}
+aids %>% 
+  select(-race)
+```
+
+For each row $i$ of the table, denote
+
+$$
+\begin{cases}
+n_i = \text{yes} + \text{no} \\
+y_i = \text{yes} = \text{binomial parameter with}\: \pi_i
+\end{cases}
+$$
+
+Then the model can be specified in ANOVA term.
+
+
+\begin{equation}
+\ln\frac{\pi_i}{1 - \pi_i} = \alpha + \beta_i, \: i = 1, 2, \ldots, I
+\end{equation}
+
+
+For redunduncies, we add a constraint. Among the three, we can choose anything.
+
+\begin{equation}
+\beta_1 = 0
+\end{equation}
+
+\begin{equation}
+\beta_I = 0
+\end{equation}
+
+\begin{equation}
+\sum_i \beta_i = 0
+\end{equation}
+
+### Two-way ANOVA representation
+
+```{r}
+aids
+```
+
+$$
+\ln\frac{\pi_i}{1 - \pi_i} = \alpha + \beta_i^X + \beta_k^Z, \quad i = 1, \ldots, I,\: j = 1, \ldots, I
+$$
+
+constraint to $\beta_i^X$ and $\beta_i^Z$ among `(2)-(4)`. This model induces the relationship between $Y$ and $X$ given $Z$, i.e. conditional dependence.
+
+## Indicator Variables
+
+ANOVA-type model have presented various restrictions to allow parameters have non-negative degrees of freedom. Recall that in ANOVA, it might be important to construct _orthogonal design_. This leads to the following indicator variables coding for qualitative predictors.
+
+### Dummy Coding
+
+From `(2)` or `(3)`, we can implement so-called _dummy coding_. For example, `(3)` results in
+
+| |$x_1$|$x_2$|$\cdots$|$x_{I-1}$|  
+|:---:|:---:|:---:|:---:|:---:|  
+|1|1|0|$\cdots$|0|  
+|2|0|1|$\cdots$|0|  
+|$\cdots$|$\cdots$|$\cdots$|$\cdots$|$\cdots$|  
+|I-1|0|0|$\cdots$|1|  
+|I|0|0|$\cdots$|0|  
+
+```{r}
+C(aids$azt %>% factor(),
+  contr = contr.treatment, base = 2)
+```
+
+Here, dummy coding $\beta_2 = 0$ corresponds to
+
+$$logit\pi = \beta_1 - \beta_2 = \beta_1$$
+
+Thus, the estimate for reference category is the difference in logit (at a fixed level of $Z$).
+
+On the other hand, when $\beta_1 = 0$ restriction is applied, the default `base = 1` can be used.
+
+```{r}
+C(aids$azt %>% factor(),
+  contr = contr.treatment)
+```
+
+This can be interpreted as
+
+$$logit\pi = \beta_1 - \beta_2 = -\beta_2$$
+
+We might observe that the estimated coefficient will have reversed sign with the above $\beta_2 = 0$ coding.
+
+### Effect Coding
+
+From `(4)`, the last value can be coded as `-1`.
+
+| |$x_1$|$x_2$|$\cdots$|$x_{I-1}$|  
+|:---:|:---:|:---:|:---:|:---:|  
+|1|1|0|$\cdots$|0|  
+|2|0|1|$\cdots$|0|  
+|$\cdots$|$\cdots$|$\cdots$|$\cdots$|$\cdots$|  
+|I-1|0|0|$\cdots$|1|  
+|I|-1|-1|$\cdots$|-1|  
+
+```{r}
+C(aids$azt %>% factor(),
+  contr = contr.sum)
+```
+
+This corresponds to
+
+$$logit\pi = \beta_1 - \beta_2 = 2\beta_1$$
+
+The log odds ratio becomes twice of dummy coding induced by `(3)`. In terms of model parameter estimates, it would be the half of the dummy coding.
+
+## Linear Logit Model for Contingency Tables
+
+### Ordering categories
+
+ANOVA-type model `(1)` is invariant to the factor-ordering.
+
+\begin{equation}
+logit(\pi_i) = \alpha + \beta x_i
+\end{equation}
+
+### Long data
+
+To easily fit `glm`, we change the data to long format.
+
+```{r}
+(long_aids <-
+  aids %>% 
+  gather(yes, no, key = symptom, value = count) %>% 
+  mutate(symptom = ifelse(symptom == "yes", 1, 0)) %>% 
+  mutate_if(is.character, factor)) # to apply C() function
+```
+
+
+### Dummy Coding
+
+By default, `base = 1` is used.
+
+```{r}
+C(long_aids$azt,
+  contr = contr.treatment, base = 1)
+C(long_aids$race,
+  contr = contr.treatment, base = 1)
+```
+
+In an _alphabetical order_, `yes` and `white` each become the last category. We can manually set this with `level` option in `factor()` function. In `glm()`, there is an argument `contrasts = NULL`. This leads to `contr.treatment(base = 1)`.
+
+$$AZT_{yes} = \begin{cases} 1 & \text{if yes} \\ 0 & \text{if no} \end{cases}$$
+
+$$RACE_{white} = \begin{cases} 1 & \text{if white} \\ 0 & \text{if black} \end{cases}$$
+
+```{r}
+(dummy_last <-
+  long_aids %>% 
+  glm(symptom ~ azt + race, data = ., weights = count, family = binomial())) %>% 
+  summary()
+```
+
+```{r}
+dummy_last$contrasts
+```
+
+\begin{equation}
+logit(\hat\pi) = -1.0736 - \underset{p-val = 0.0099}{0.7195} AZT_{yes} + \underset{p-val = 0.8476}{0.0555} RACE_{white}
+\end{equation}
+
+Controlling `racewhite`, we can say that `aztyes` significantly affects aids `symptom`.
+
+### Dummy Coding with another `base`
+
+By changing the dataset, we can freely implement the other qualitative coding. (Or we can specify the `contrasts` argument, e.g. `contrasts = c("contr.treatment", "contr.treatment")`.) We now try `contr.treatment(base = 2)`.
+
+```{r}
+C(long_aids$azt,
+  contr = contr.treatment, base = 2)
+C(long_aids$race,
+  contr = contr.treatment, base = 2)
+```
+
+$$AZT_{no} = \begin{cases} 0 & \text{if yes} \\ 1 & \text{if no} \end{cases}$$
+
+$$RACE_{black} = \begin{cases} 0 & \text{if white} \\ 1 & \text{if black} \end{cases}$$
+
+```{r}
+(dummy_first <-
+  long_aids %>% 
+  mutate_if(is.factor,
+            funs(C(., contr = contr.treatment, base = 2))) %>% 
+  glm(symptom ~ azt + race, data = ., weights = count, family = binomial())) %>% 
+  summary()
+```
+
+```{r}
+dummy_first$contrasts
+```
+
+
+\begin{equation}
+logit(\hat\pi) = -1.0736 + \underset{p-val = 0.0099}{0.7195} AZT_{no} - \underset{p-val = 0.8476}{0.0555} RACE_{black}
+\end{equation}
+
+As mentioned, the absolute values of the estimates are exactly same. The only differences are _their signs_ by changing the definition of their variables.
+
+### Effect Coding
+
+In the same manner, `contr.sum` adjust $\sum\limits_i \beta_i = 0$ contraints.
+
+```{r}
+C(long_aids$azt,
+  contr = contr.sum)
+C(long_aids$race,
+  contr = contr.sum)
+```
+
+$$AZT_{effect} = \begin{cases} 1 & \text{if yes} \\ -1 & \text{if no} \end{cases}$$
+
+$$RACE_{effect} = \begin{cases} 1 & \text{if white} \\ -1 & \text{if black} \end{cases}$$
+
+```{r}
+(effect_sum <-
+  long_aids %>% 
+  mutate_if(is.factor,
+            funs(C(., contr = contr.sum))) %>% 
+  glm(symptom ~ azt + race, data = ., weights = count, family = binomial())) %>% 
+  summary()
+```
+
+```{r}
+effect_sum$contrasts
+```
+
+\begin{equation}
+logit(\hat\pi) = -1.4056 + \underset{p-val = 0.01}{0.36} AZT_{effect} - \underset{p-val = 0.8476}{0.0277} RACE_{effect}
+\end{equation}
+
+```{r, echo=FALSE}
+round(coef(effect_sum), 3) == round(coef(dummy_first) / 2, 3)
+```
+
+We can see the both $\beta_1$ and $\beta_2$ of `(8)` are half of the model `(7)`.
+
+## Fitted values
+
+Using the fitted logit model, we can estimate the expected frequency of contingency table. Given fitted model, we can estimate each conditional probabiltiy by
+
+$$\hat\pi_{j \mid i} = P(Y_i = 1 \mid Z = j)$$
+
+In `predict.glm()`, `type = "response"` option computes these probabilities. Also, the model object already has these values for the data set in `fitted.values`.
+
+```{r}
+dummy_last$fitted.values
+dummy_first$fitted.values
+effect_sum$fitted.values
+```
+
+Then the fitted number of successes(`yes`) becomes
+
+$$\{ \hat\mu_{ij} = n_{i+}\hat\pi_{j \mid j} \}$$
+
+```{r}
+predict(dummy_last, type = "terms")
+```
+
+
+
+
+
