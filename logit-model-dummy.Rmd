@@ -1,5 +1,8 @@
 ```{r, include=FALSE}
 library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(formattable)
 ```
 
 # Logit Model for Qualitative Predictors
@@ -10,17 +13,54 @@ aids <- read_table("data/AIDS.dat")
 
 <!-- change to format = latex before compiling -->
 
-```{r, echo=FALSE, results='asis'}
-knitr::kable(aids %>% group_by(race), format = "html", row.names = FALSE, booktabs = TRUE,
-             col.names = c("Race", "AZT Use", "Yes", "No")) %>% 
-  kableExtra::kable_styling(latex_options = "striped") %>% 
-  kableExtra::add_header_above(header = c(" ", " ", "Symptoms" = 2)) %>% 
-  kableExtra::collapse_rows(columns = 1)
+```{r, echo=FALSE}
+# https://haozhu233.github.io/kableExtra/awesome_table_in_html.html
+aids %>% 
+  group_by(race) %>% 
+  gather(yes, no, key = symptom, value = count, factor_key = TRUE) %>% # just to consider symptom columns at once
+  mutate_if(is.numeric, function(x) {
+    cell_spec(x, bold = TRUE,
+              color = spec_color(x, begin = .3, end = .6),
+              font_size = spec_font_size(-x, begin = 11))
+  }) %>% 
+  mutate(azt = cell_spec(
+    azt, color = "white", bold = TRUE,
+    background = spec_color(1:2, begin = .2, end = .7, option = "plasma", direction = 1)
+  )) %>% 
+  spread(symptom, count) %>% # return to the original set
+  arrange(desc(race)) %>% # return to the original set
+  kable(escape = FALSE, format = "html", row.names = FALSE, booktabs = TRUE,
+        col.names = c("Race", "AZT Use", "Yes", "No"),
+        align = "c") %>% 
+  kable_styling(latex_options = c("striped", "condensed"), full_width = FALSE) %>% 
+  add_header_above(header = c(" ", " ", "Symptoms" = 2)) %>% 
+  collapse_rows(columns = 1)
 ```
 
-$$Y = \text{symptoms} = \begin{cases} \text{yes} \\ \text{no} \end{cases}$$
+```{r, echo=FALSE, eval=FALSE}
+# https://haozhu233.github.io/kableExtra/awesome_table_in_html.html
+aids %>% 
+  group_by(race) %>% 
+  gather(yes, no, key = symptom, value = count, factor_key = TRUE) %>% # just to consider symptom columns at once
+  mutate_if(is.numeric, formattable::color_bar(color = "lightgreen")) %>% 
+  mutate(azt = cell_spec(
+    azt, color = "white", bold = TRUE,
+    background = spec_color(1:2, begin = .2, end = .7, option = "plasma", direction = 1)
+  )) %>% 
+  spread(symptom, count) %>% # return to the original set
+  arrange(desc(race)) %>% # return to the original set
+  kable(escape = FALSE, format = "html", row.names = FALSE, booktabs = TRUE,
+        col.names = c("Race", "AZT Use", "Yes", "No")) %>% 
+  kable_styling(latex_options = c("striped", "condensed"), full_width = FALSE) %>% 
+  add_header_above(header = c(" ", " ", "Symptoms" = 2)) %>% 
+  collapse_rows(columns = 1)
+```
 
-Here, our main interest is whether the usage of AZT(`azt`) would affect this binary response. Denote that the `azt` is also categorical predictor.
+Looking at the above table, direct usage of `azt` is likely to result in _reduced AIDS symptoms_ (we can check this visually). Our main interest is to analyze this relationship. To model this, we first define the binary response by
+
+$$Y = \text{symptoms} = \begin{cases} \text{yes} = 1 \\ \text{no} = 0 \end{cases}$$
+
+Denote that the (AZT)`azt` is also categorical predictor.
 
 $$X = \text{AZT} = \begin{cases} \text{yes} \\ \text{no} \end{cases}$$
 
@@ -28,7 +68,7 @@ There is another factor `race` that has possibility to be covariate.
 
 $$Z = \text{Race} = \begin{cases} \text{White} \\ \text{Black} \end{cases}$$
 
-Based on the interest, we need to control the effect of this covariate.
+Based on our interest, we need to control the effect of this covariate.
 
 ## ANOVA-Type Representation of Factors
 
@@ -281,23 +321,84 @@ We can see the both $\beta_1$ and $\beta_2$ of `(8)` are half of the model `(7)`
 
 Using the fitted logit model, we can estimate the expected frequency of contingency table. Given fitted model, we can estimate each conditional probabiltiy by
 
-$$\hat\pi_{j \mid i} = P(Y_i = 1 \mid Z = j)$$
+$$\hat\pi_{j \mid i} = P(Y_i = 1 \mid Z = j) = \frac{\exp(\hat\alpha + \hat\beta_1X + \hat\beta_2Z)}{1 + \exp(\hat\alpha + \hat\beta_1X + \hat\beta_2Z)}$$
 
-In `predict.glm()`, `type = "response"` option computes these probabilities. Also, the model object already has these values for the data set in `fitted.values`.
+`predict()` for `glm` object gives various values with `type` option.
+
+- By default, `type = "link"` gives the linear fit on link scale: this is same as `fit$linear.predictors`
+-  `type = "response"`: on the scale of the response variable, here gives probabilities on logit we want = `fit$fitted.values`
+- `type = "terms"`: on the scale of linear predictor scale
+
 
 ```{r}
+predict(dummy_last, type = "response")
 dummy_last$fitted.values
-dummy_first$fitted.values
-effect_sum$fitted.values
 ```
-
-Then the fitted number of successes(`yes`) becomes
-
-$$\{ \hat\mu_{ij} = n_{i+}\hat\pi_{j \mid j} \}$$
 
 ```{r}
-predict(dummy_last, type = "terms")
+(pred_prob <-
+  long_aids %>% 
+  mutate(pred_dummy1 = predict(dummy_last,
+                               newdata = data_frame(race = race, azt = azt),
+                               type = "response"),
+         pred_dummy2 = predict(dummy_last,
+                               newdata = data_frame(race = race, azt = azt),
+                               type = "response"),
+         pred_effect = predict(dummy_last,
+                               newdata = data_frame(race = race, azt = azt),
+                               type = "response")) %>% 
+  spread(symptom, count) %>% # return to contingency table format
+  select(race, azt, yes = "0", no = "1",
+         pred_dummy1, pred_dummy2, pred_effect))
 ```
+
+In fact, coding does not affect goodness-of-fit. Obviously, less probability is likely occur when the patient dose AZT directly.
+
+```{r}
+(pred_prob <-
+  long_aids %>% 
+  mutate(pred_prob = predict(dummy_last,
+                               newdata = data_frame(race = race, azt = azt),
+                               type = "response")
+         ) %>% 
+  spread(symptom, count) %>% # return to contingency table format
+  rename(yes = "1", no = "0") %>% 
+  select(race, azt, yes, no, pred_prob)) %>% 
+  gather(yes, no, key = symptom, value = count) %>% # to plot
+  ggplot() +
+  aes(x = race, y = pred_prob, group = azt) +
+  geom_line(aes(colour = azt)) +
+  labs(
+    x = "Race",
+    y = expression(pi),
+    parse = TRUE
+  )
+```
+
+Then we can estimate the number of successes by
+
+$$\{ \hat\mu_{ij} = n_{i+}\hat\pi_{j \mid i} \}$$
+
+```{r}
+pred_prob %>% 
+  mutate(yes_fit = (yes + no) * pred_prob,
+         no_fit = (yes + no) * (1 - pred_prob)) %>% 
+  arrange(desc(race), desc(azt)) %>% 
+  select(race, azt, yes, yes_fit, no, no_fit, pred_prob)
+```
+
+## Appendix {-}
+
+We can also use contingency table form for `glm()`
+
+```{r}
+aids %>% 
+  mutate(Sum = yes + no) %>% 
+  glm(yes/Sum ~ azt + race, data = ., weights = Sum, family = binomial())
+```
+
+
+
 
 
 
