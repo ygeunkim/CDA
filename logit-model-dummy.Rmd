@@ -1,8 +1,24 @@
+```{r, message=FALSE}
+library(tidyverse) # handling data
+library(knitr) # formatting tables
+library(kableExtra) # extra format -- multirow, xcolor, etc
+```
+
 ```{r, include=FALSE}
-library(tidyverse)
-library(knitr)
-library(kableExtra)
-library(formattable)
+# https://stackoverflow.com/questions/13848137/figure-captions-references-using-knitr-and-markdown-to-html
+fig <- local({
+    i <- 0
+    ref <- list()
+    list(
+        cap = function(refName, text) {
+            i <<- i + 1
+            ref[[refName]] <<- stringr::str_c("Figure ", i) # in the text
+            text # under the plot
+        },
+        ref = function(refName) {
+            ref[[refName]]
+        })
+})
 ```
 
 # Logit Model for Qualitative Predictors
@@ -12,10 +28,11 @@ aids <- read_table("data/AIDS.dat")
 ```
 
 <!-- change to format = latex before compiling -->
+<!-- Option clash for package xcolor: problem of knitr/kableExtra?? -->
+<!-- works in Macbook pro 2013 late, but error in 2015 late: why?? -->
 
 ```{r, echo=FALSE}
-# https://haozhu233.github.io/kableExtra/awesome_table_in_html.html
-aids %>% 
+aids %>% # https://haozhu233.github.io/kableExtra/awesome_table_in_html.html
   group_by(race) %>% 
   gather(yes, no, key = symptom, value = count, factor_key = TRUE) %>% # just to consider symptom columns at once
   mutate_if(is.numeric, function(x) {
@@ -29,34 +46,16 @@ aids %>%
   )) %>% 
   spread(symptom, count) %>% # return to the original set
   arrange(desc(race)) %>% # return to the original set
-  kable(escape = FALSE, format = "html", row.names = FALSE, booktabs = TRUE,
+  kable(escape = FALSE, format = "latex", row.names = FALSE, booktabs = TRUE,
         col.names = c("Race", "AZT Use", "Yes", "No"),
+        caption = "Development of AIDS Symptoms by AZT Use and Race",
         align = "c") %>% 
-  kable_styling(latex_options = c("striped", "condensed"), full_width = FALSE) %>% 
+  kable_styling(bootstrap_options = "striped", latex_options = "HOLD_position", full_width = FALSE) %>% 
   add_header_above(header = c(" ", " ", "Symptoms" = 2)) %>% 
   collapse_rows(columns = 1)
 ```
 
-```{r, echo=FALSE, eval=FALSE}
-# https://haozhu233.github.io/kableExtra/awesome_table_in_html.html
-aids %>% 
-  group_by(race) %>% 
-  gather(yes, no, key = symptom, value = count, factor_key = TRUE) %>% # just to consider symptom columns at once
-  mutate_if(is.numeric, formattable::color_bar(color = "lightgreen")) %>% 
-  mutate(azt = cell_spec(
-    azt, color = "white", bold = TRUE,
-    background = spec_color(1:2, begin = .2, end = .7, option = "plasma", direction = 1)
-  )) %>% 
-  spread(symptom, count) %>% # return to the original set
-  arrange(desc(race)) %>% # return to the original set
-  kable(escape = FALSE, format = "html", row.names = FALSE, booktabs = TRUE,
-        col.names = c("Race", "AZT Use", "Yes", "No")) %>% 
-  kable_styling(latex_options = c("striped", "condensed"), full_width = FALSE) %>% 
-  add_header_above(header = c(" ", " ", "Symptoms" = 2)) %>% 
-  collapse_rows(columns = 1)
-```
-
-Looking at the above table, direct usage of `azt` is likely to result in _reduced AIDS symptoms_ (we can check this visually). Our main interest is to analyze this relationship. To model this, we first define the binary response by
+Looking at the above table, direct usage of `azt` is likely to result in _slowing the development of AIDS symptoms_ (we can check this visually in `Table 1`). Our main interest is to analyze this relationship. To model this, we first define the binary response by
 
 $$Y = \text{symptoms} = \begin{cases} \text{yes} = 1 \\ \text{no} = 0 \end{cases}$$
 
@@ -92,21 +91,23 @@ $$
 
 Then the model can be specified in ANOVA term.
 
-
 \begin{equation}
 \ln\frac{\pi_i}{1 - \pi_i} = \alpha + \beta_i, \: i = 1, 2, \ldots, I
 \end{equation}
 
-
-For redunduncies, we add a constraint. Among the three, we can choose anything.
+For redunduncies, we add a constraint. Among the three, we can choose anything. We can set the frist term zero.
 
 \begin{equation}
 \beta_1 = 0
 \end{equation}
 
+Similarly, the last term can be set zero. Any other single $j$-term can be chosen.
+
 \begin{equation}
 \beta_I = 0
 \end{equation}
+
+By setting the whole sum as zero, we can guarantee the uniqueness.
 
 \begin{equation}
 \sum_i \beta_i = 0
@@ -141,7 +142,7 @@ From `(2)` or `(3)`, we can implement so-called _dummy coding_. For example, `(3
 |I|0|0|$\cdots$|0|  
 
 ```{r}
-C(aids$azt %>% factor(),
+C(aids$azt %>% factor(levels = c("yes", "no")),
   contr = contr.treatment, base = 2)
 ```
 
@@ -154,7 +155,7 @@ Thus, the estimate for reference category is the difference in logit (at a fixed
 On the other hand, when $\beta_1 = 0$ restriction is applied, the default `base = 1` can be used.
 
 ```{r}
-C(aids$azt %>% factor(),
+C(aids$azt %>% factor(levels = c("yes", "no")),
   contr = contr.treatment)
 ```
 
@@ -177,7 +178,7 @@ From `(4)`, the last value can be coded as `-1`.
 |I|-1|-1|$\cdots$|-1|  
 
 ```{r}
-C(aids$azt %>% factor(),
+C(aids$azt %>% factor(levels = c("yes", "no")),
   contr = contr.sum)
 ```
 
@@ -199,18 +200,33 @@ logit(\pi_i) = \alpha + \beta x_i
 
 ### Long data
 
-To easily fit `glm`, we change the data to long format.
+To easily fit `glm`, we change the data to long format. We can handle `symptom` in two way. Using `factor` or dichotomous `1-0` numeric. `CRAN documentation` for `binomial()` link function gives those approach.
+
+> As a numerical vector with values between 0 and 1, interpreted as the proportion of successful cases (with the total number of cases given by the weights).
+
+For this, we set development of AIDS as $Y = 1$, otherwise $Y = 0$.
+
+```{r}
+aids %>% 
+  gather(yes, no, key = symptom, value = count) %>% 
+  mutate(symptom = ifelse(symptom == "yes", 1, 0)) %>% 
+  mutate_if(is.character, factor) # to apply C() function
+```
+
+> As a factor: ‘success’ is interpreted as the factor not having the first level (and hence usually of having the second level).
+
+This means that if we put `no` followed by `yes`, `glm()` will fit $P(AIDS = yes)$.
 
 ```{r}
 (long_aids <-
   aids %>% 
-  gather(yes, no, key = symptom, value = count) %>% 
-  mutate(symptom = ifelse(symptom == "yes", 1, 0)) %>% 
-  mutate_if(is.character, factor)) # to apply C() function
+  gather(no, yes, key = symptom, value = count, factor_key = TRUE) %>% # yes after no
+  mutate_if(is.character, function(x) {
+    factor(x, levels = unique(x)) # levels = same order as in data
+  }))
 ```
 
-
-### Dummy Coding
+### Dummy Coding induce by `(2)`
 
 By default, `base = 1` is used.
 
@@ -221,39 +237,7 @@ C(long_aids$race,
   contr = contr.treatment, base = 1)
 ```
 
-In an _alphabetical order_, `yes` and `white` each become the last category. We can manually set this with `level` option in `factor()` function. In `glm()`, there is an argument `contrasts = NULL`. This leads to `contr.treatment(base = 1)`.
-
-$$AZT_{yes} = \begin{cases} 1 & \text{if yes} \\ 0 & \text{if no} \end{cases}$$
-
-$$RACE_{white} = \begin{cases} 1 & \text{if white} \\ 0 & \text{if black} \end{cases}$$
-
-```{r}
-(dummy_last <-
-  long_aids %>% 
-  glm(symptom ~ azt + race, data = ., weights = count, family = binomial())) %>% 
-  summary()
-```
-
-```{r}
-dummy_last$contrasts
-```
-
-\begin{equation}
-logit(\hat\pi) = -1.0736 - \underset{p-val = 0.0099}{0.7195} AZT_{yes} + \underset{p-val = 0.8476}{0.0555} RACE_{white}
-\end{equation}
-
-Controlling `racewhite`, we can say that `aztyes` significantly affects aids `symptom`.
-
-### Dummy Coding with another `base`
-
-By changing the dataset, we can freely implement the other qualitative coding. (Or we can specify the `contrasts` argument, e.g. `contrasts = c("contr.treatment", "contr.treatment")`.) We now try `contr.treatment(base = 2)`.
-
-```{r}
-C(long_aids$azt,
-  contr = contr.treatment, base = 2)
-C(long_aids$race,
-  contr = contr.treatment, base = 2)
-```
+`factor()` choose its level by an _alphabetical order_. Here we have set the levels manually with `levels` option in the function, which are the same as the order of the data. In `glm()`, there is an argument `contrasts = NULL`. This leads to `contr.treatment(base = 1)`.
 
 $$AZT_{no} = \begin{cases} 0 & \text{if yes} \\ 1 & \text{if no} \end{cases}$$
 
@@ -262,8 +246,6 @@ $$RACE_{black} = \begin{cases} 0 & \text{if white} \\ 1 & \text{if black} \end{c
 ```{r}
 (dummy_first <-
   long_aids %>% 
-  mutate_if(is.factor,
-            funs(C(., contr = contr.treatment, base = 2))) %>% 
   glm(symptom ~ azt + race, data = ., weights = count, family = binomial())) %>% 
   summary()
 ```
@@ -272,16 +254,61 @@ $$RACE_{black} = \begin{cases} 0 & \text{if white} \\ 1 & \text{if black} \end{c
 dummy_first$contrasts
 ```
 
+\begin{equation}
+logit(\hat\pi) = -1.7376 + \underset{p-val = 0.0099}{0.7195} AZT_{no} - \underset{p-val = 0.8476}{0.0555} RACE_{black}
+\end{equation}
+
+Controlling `raceblack`, we can say that `aztno` significantly affects aids `symptom`.
+
+### Dummy Coding induced by `(3)`
+
+By changing the dataset, we can freely implement the other qualitative coding. We now try `contr.treatment(base = 2)`, i.e. setting the last term zero.
+
+```{r}
+C(long_aids$azt,
+  contr = contr.treatment, base = 2)
+C(long_aids$race,
+  contr = contr.treatment, base = 2)
+```
+
+$$AZT_{yes} = \begin{cases} 1 & \text{if yes} \\ 0 & \text{if no} \end{cases}$$
+
+$$RACE_{white} = \begin{cases} 1 & \text{if white} \\ 0 & \text{if black} \end{cases}$$
+
+```{r}
+make_dummy <- function(x, contr, ...) { # for coefficients' names
+  new_x <- C(x, contr = contr, ...)
+  attr_x <- attributes(new_x)$contrasts
+  colnames(attributes(new_x)$contrasts) <- rownames(attr_x)[attr_x > 0]
+  new_x
+}
+```
+
+Applying `C(contr = contr.treatment, base = 2)`, we get
+
+```{r}
+(dummy_last <-
+  long_aids %>% 
+  mutate_at(.vars = vars(azt, race),
+            .funs = funs(make_dummy(., contr = contr.treatment, base = 2))) %>% 
+  glm(symptom ~ azt + race, data = ., weights = count, family = binomial())) %>% 
+  summary()
+```
+
+```{r}
+dummy_last$contrasts
+```
+
 
 \begin{equation}
-logit(\hat\pi) = -1.0736 + \underset{p-val = 0.0099}{0.7195} AZT_{no} - \underset{p-val = 0.8476}{0.0555} RACE_{black}
+logit(\hat\pi) = -1.0736 - \underset{p-val = 0.0099}{0.7195} AZT_{yes} + \underset{p-val = 0.8476}{0.0555} RACE_{white}
 \end{equation}
 
 As mentioned, the absolute values of the estimates are exactly same. The only differences are _their signs_ by changing the definition of their variables.
 
 ### Effect Coding
 
-In the same manner, `contr.sum` adjust $\sum\limits_i \beta_i = 0$ contraints.
+In the same manner, `contr.sum` adjust $\sum\limits_i \beta_i = 0$ contraints. Or we can specify the `contrasts` argument, e.g. `contrasts = list(azt = "contr.sum", race = "contr.sum")`.
 
 ```{r}
 C(long_aids$azt,
@@ -290,44 +317,60 @@ C(long_aids$race,
   contr = contr.sum)
 ```
 
-$$AZT_{effect} = \begin{cases} 1 & \text{if yes} \\ -1 & \text{if no} \end{cases}$$
+$$AZT_1 = \begin{cases} 1 & \text{if yes} \\ -1 & \text{if no} \end{cases}$$
 
-$$RACE_{effect} = \begin{cases} 1 & \text{if white} \\ -1 & \text{if black} \end{cases}$$
+$$RACE_1 = \begin{cases} 1 & \text{if white} \\ -1 & \text{if black} \end{cases}$$
 
 ```{r}
 (effect_sum <-
   long_aids %>% 
-  mutate_if(is.factor,
-            funs(C(., contr = contr.sum))) %>% 
-  glm(symptom ~ azt + race, data = ., weights = count, family = binomial())) %>% 
+  glm(symptom ~ azt + race, data = ., weights = count, family = binomial(),
+      contrasts = list(azt = "contr.sum", race = "contr.sum"))) %>% 
   summary()
 ```
+
 
 ```{r}
 effect_sum$contrasts
 ```
 
 \begin{equation}
-logit(\hat\pi) = -1.4056 + \underset{p-val = 0.01}{0.36} AZT_{effect} - \underset{p-val = 0.8476}{0.0277} RACE_{effect}
+logit(\hat\pi) = -1.4056 - \underset{p-val = 0.01}{0.36} AZT_{effect} - \underset{p-val = 0.8476}{0.0277} RACE_{effect}
 \end{equation}
 
 ```{r, echo=FALSE}
-round(coef(effect_sum), 3) == round(coef(dummy_first) / 2, 3)
+round(coef(effect_sum), 3) == round(coef(dummy_last) / 2, 3)
 ```
 
 We can see the both $\beta_1$ and $\beta_2$ of `(8)` are half of the model `(7)`.
 
+## Confidence Intervals
+
+<!-- MASS::confint versus confint.default -->
+
+`confint()` gives CI computed by profile likelihood, if `MASS` package is installed.
+
+```{r, message=FALSE}
+lapply(list(First_zero = dummy_first, Last_zero = dummy_last, Sum_zero = effect_sum), confint)
+```
+
+or `confint.default()` gives CI computed by the standard error.
+
+```{r}
+lapply(list(First_zero = dummy_first, Last_zero = dummy_last, Sum_zero = effect_sum), confint.default)
+```
+
 ## Fitted values
 
-Using the fitted logit model, we can estimate the expected frequency of contingency table. Given fitted model, we can estimate each conditional probabiltiy by
+Using the fitted logit model, we can estimate the expected frequency of contingency table. Before that, estimate each success conditional probabiltiy, i.e. probability of AIDS development by
 
 $$\hat\pi_{j \mid i} = P(Y_i = 1 \mid Z = j) = \frac{\exp(\hat\alpha + \hat\beta_1X + \hat\beta_2Z)}{1 + \exp(\hat\alpha + \hat\beta_1X + \hat\beta_2Z)}$$
 
 `predict()` for `glm` object gives various values with `type` option.
 
-- By default, `type = "link"` gives the linear fit on link scale: this is same as `fit$linear.predictors`
--  `type = "response"`: on the scale of the response variable, here gives probabilities on logit we want = `fit$fitted.values`
-- `type = "terms"`: on the scale of linear predictor scale
+1. By default, `type = "link"` gives the linear fit on link scale: this is same as `fit$linear.predictors`
+2.  `type = "response"`: on the scale of the response variable, here gives probabilities on logit we want = `fit$fitted.values`
+3. `type = "terms"`: on the scale of linear predictor scale
 
 
 ```{r}
@@ -336,8 +379,7 @@ dummy_last$fitted.values
 ```
 
 ```{r}
-(pred_prob <-
-  long_aids %>% 
+long_aids %>% 
   mutate(pred_dummy1 = predict(dummy_last,
                                newdata = data_frame(race = race, azt = azt),
                                type = "response"),
@@ -348,13 +390,13 @@ dummy_last$fitted.values
                                newdata = data_frame(race = race, azt = azt),
                                type = "response")) %>% 
   spread(symptom, count) %>% # return to contingency table format
-  select(race, azt, yes = "0", no = "1",
-         pred_dummy1, pred_dummy2, pred_effect))
+  select(race, azt, yes, no,
+         pred_dummy1, pred_dummy2, pred_effect)
 ```
 
-In fact, coding does not affect goodness-of-fit. Obviously, less probability is likely occur when the patient dose AZT directly.
+In fact, coding does not affect goodness-of-fit.
 
-```{r}
+```{r probaids, fig.cap=fig$cap("probaids", "Conditional probability of developing AIDS symptoms")}
 (pred_prob <-
   long_aids %>% 
   mutate(pred_prob = predict(dummy_last,
@@ -362,7 +404,6 @@ In fact, coding does not affect goodness-of-fit. Obviously, less probability is 
                                type = "response")
          ) %>% 
   spread(symptom, count) %>% # return to contingency table format
-  rename(yes = "1", no = "0") %>% 
   select(race, azt, yes, no, pred_prob)) %>% 
   gather(yes, no, key = symptom, value = count) %>% # to plot
   ggplot() +
@@ -375,7 +416,7 @@ In fact, coding does not affect goodness-of-fit. Obviously, less probability is 
   )
 ```
 
-Then we can estimate the number of successes by
+Obviously, less probability is likely occur when the patient dose AZT directly. In `r fig$ref("probaids")`, the probability differs between AZT usage, while not between race. Now we can estimate the number of successes by
 
 $$\{ \hat\mu_{ij} = n_{i+}\hat\pi_{j \mid i} \}$$
 
@@ -386,6 +427,51 @@ pred_prob %>%
   arrange(desc(race), desc(azt)) %>% 
   select(race, azt, yes, yes_fit, no, no_fit, pred_prob)
 ```
+
+It can be estimated as
+
+```{r}
+pred_prob %>% 
+  mutate(yes_fit = (yes + no) * pred_prob %>% round(digits = 1),
+         no_fit = (yes + no) * (1 - pred_prob) %>% round(digits = 1)) %>% 
+  unite("Yes", starts_with("yes"), sep = " vs ") %>% 
+  unite("No", starts_with("no"), sep = " vs ")
+```
+
+In sum,
+
+```{r, echo=FALSE}
+pred_prob %>% 
+  mutate(yes_fit = round((yes + no) * pred_prob, digits = 1),
+         no_fit = round((yes + no) * (1 - pred_prob), digits = 1),
+         pred_no = round(1 - pred_prob, digits = 3),
+         pred_prob = round(pred_prob, digits = 3)) %>% 
+  select(race, azt, pred_prob, pred_no, yes_fit, no_fit) %>% 
+  gather(yes_fit, no_fit, key = fit, value = count) %>%
+  gather(pred_prob, pred_no, key = prob, value = pred) %>%
+  mutate_if(is.numeric, function(x) {
+    cell_spec(x, bold = TRUE,
+              color = spec_color(-x, end = .9),
+              font_size = spec_font_size(x, begin = 10))
+  }) %>% 
+  group_by(race) %>% 
+  mutate(azt = cell_spec(
+    azt, color = "white", bold = TRUE,
+    background = spec_color(1:2, begin = .2, end = .7, option = "plasma", direction = 1)
+  )) %>% 
+  ungroup(race) %>% 
+  spread(prob, pred) %>% 
+  spread(fit, count) %>% 
+  select(race, azt, pred_prob, pred_no, yes_fit, no_fit) %>% 
+  kable(escape = FALSE, format = "latex", row.names = FALSE, booktabs = TRUE,
+        col.names = c("Race", "AZT Use", "Yes", "No", "Yes", "No"),
+        caption = "Estimated probability and Fitted number",
+        align = "c") %>% 
+  kable_styling(bootstrap_options = "striped", latex_options = "HOLD_position", full_width = FALSE) %>% 
+  add_header_above(header = c(" ", " ", "Fitted Probability" = 2, "Fitted number" = 2))
+```
+
+<!-- round probabilities -->
 
 ## Appendix {-}
 
