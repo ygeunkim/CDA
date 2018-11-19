@@ -1,5 +1,185 @@
-```{r, include=FALSE}
+```{r, message=FALSE}
 library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(formattable)
 ```
 
 # Logistic Regression
+
+## Horseshoe crab data
+
+```{r, message=FALSE}
+crab <- read_table("data/Crabs.dat")
+```
+
+```{r}
+crab %>% 
+  mutate(
+    sat = color_tile("white", "red")(sat),
+    y = color_tile("white", "red")(y),
+    weight = color_bar("lightblue")(weight),
+    width = color_bar("lightgreen")(width),
+    color = cell_spec(
+      color,
+      color = spec_color(color, direction = -1)
+    ),
+    spine = cell_spec(
+      spine,
+      color = spec_color(spine)
+    )
+  ) %>% 
+  head() %>% 
+  kable(format = "html", escape = FALSE,
+        col.names = c("crab", "Satellites", "y", "Weight(kg)", "carapace width(cm)", "Color", "spine condition")) %>% 
+  kable_styling("hover")
+```
+
+$$y_i = \begin{cases} 1 & \text{crab}\: i \:\text{has at least one satellite} \\ 0 & \text{crab}\: i \:\text{does not have satellite} \end{cases}$$
+
+> Does the female crab's carapace width is related to this binary response?
+
+Looking at the above data set in the eye, large width can help the crab have satellites. Let's check it out.
+
+```{r}
+crab %>% 
+  ggplot() +
+  aes(width, sat) +
+  geom_hex(show.legend = FALSE)
+```
+
+```{r}
+crab %>% 
+  group_by(width_cut = cut(width, 8, ordered_result = TRUE)) %>%
+  ggplot() +
+  aes(width_cut, sat) +
+  geom_boxplot()
+```
+
+## Inference for logistic regression
+
+$$logit[\pi(x)] = \alpha + \beta x$$
+
+```{r}
+(width_fit <-
+  crab %>% 
+  select(y, width) %>% 
+  glm(y ~ ., data = ., family = binomial())) %>% 
+  summary()
+```
+
+### Wald test
+
+$$Z = \frac{\hat\beta - \beta_0}{SE} \stackrel{H_0}{\approx} N(0, 1)$$
+
+Equivalently,
+
+$$Z^2 \stackrel{H_0}{\approx} \chi^2_1$$
+
+If multivariate,
+
+$$W = (\boldsymbol{\hat\beta} - \boldsymbol\beta)^T\Big[Cov(\boldsymbol{\hat\beta})\Big]^{-1}(\boldsymbol{\hat\beta} - \boldsymbol\beta) \stackrel{H_0}{\approx} \chi^2_p$$
+
+```{r}
+broom::tidy(width_fit) %>% 
+  bind_cols(broom::confint_tidy(width_fit)) %>% 
+  pander::pander()
+```
+
+### Likelihood ratio test
+
+$$G^2 = -2(L_0 - L_1)$$
+
+```{r}
+anova(width_fit, test = "LRT")
+```
+
+### Score test
+
+Note that
+
+$$
+\begin{equation}
+\begin{split}
+l(\beta ; \mathbf{x}) & \propto \prod_{i = 1}^n \pi(x_i)^{y_i}(1 - \pi(x_i))^{n_i - y_i}\\
+& = \exp\biggl[\sum_{i = 1}^n y_i logit(\pi(x_i)) \biggl]\prod_{i = 1}^n(1 - \pi(x_i))^{n_i} \\
+& = \exp\biggl[\sum_{i = 1}^n y_i (\alpha + \beta x_i) \biggl]\prod_{i = 1}^n\biggl[\frac{1}{1 + \exp(\alpha + \beta x_i)}\biggr]^{n_i}
+\end{split}
+\end{equation}
+$$
+
+Then
+
+$$
+L = \sum_{i = 1}^n y_i (\alpha + \beta x_i) - \sum_{i = 1}^n n_i \ln\Bigl[1 + \exp(\alpha + \beta x_i)\Bigr]
+$$
+
+$$
+\begin{equation}
+\begin{split}
+S(y ; \beta) & = -\frac{\partial}{\partial\beta}L \\
+& = \sum_{i: y_i = 1} x_i - \sum_{i: y_i = 0} n_i\frac{\exp(\alpha + \beta x_i)}{1 + \exp(\alpha + \beta x_i)} \\
+& = \sum_{i: y_i = 1} x_i - \sum_{i: y_i = 0} n_i\pi(x_i)
+\end{split}
+\end{equation}
+$$
+
+$$
+\begin{equation}
+\begin{split}
+I(\beta) & := E\Bigl[S(y ; \beta)^2\Bigr] \\
+& = Var S(y ; \beta) \\
+& = 
+\end{split}
+\end{equation}
+$$
+
+```{r}
+vcov(width_fit)
+```
+
+
+## Goodness of fit
+
+```{r}
+anova(width_fit, test = "Chisq")
+```
+
+
+```{r}
+center_fit <-
+  crab %>% 
+  mutate(width = width - mean(width)) %>% 
+  select(y, width) %>% 
+  glm(y ~ ., data = ., family = binomial())
+quad_fit <- glm(y ~ poly(width, 2), data = crab, family = binomial())
+```
+
+
+```{r}
+anova(width_fit, center_fit, quad_fit, test = "Chisq")
+```
+
+### Hosmer-Lemeshow goodness of fit
+
+```{r}
+MKmisc::HLgof.test(fit = fitted(width_fit), obs = crab$y, ngr = 8)
+```
+
+```{r}
+ResourceSelection::hoslem.test(crab$y, fitted(width_fit), g = 8)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
