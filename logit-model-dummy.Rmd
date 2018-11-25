@@ -46,7 +46,7 @@ aids %>% # https://haozhu233.github.io/kableExtra/awesome_table_in_html.html
   )) %>% 
   spread(symptom, count) %>% # return to the original set
   arrange(desc(race)) %>% # return to the original set
-  kable(escape = FALSE, format = "latex", row.names = FALSE, booktabs = TRUE,
+  kable(escape = FALSE, format = "html", row.names = FALSE, booktabs = TRUE,
         col.names = c("Race", "AZT Use", "Yes", "No"),
         caption = "Development of AIDS Symptoms by AZT Use and Race",
         align = "c") %>% 
@@ -254,8 +254,13 @@ $$RACE_{black} = \begin{cases} 0 & \text{if white} \\ 1 & \text{if black} \end{c
 dummy_first$contrasts
 ```
 
+```{r, include=FALSE}
+dummy1 <- broom::tidy(dummy_first)
+```
+
+
 \begin{equation}
-logit(\hat\pi) = -1.7376 + \underset{p-val = 0.0099}{0.7195} AZT_{no} - \underset{p-val = 0.8476}{0.0555} RACE_{black}
+logit(\hat\pi) = `r dummy1$estimate[1]`  \underset{p-val = `r dummy1$p.value[2]`}{`r dummy1$estimate[2]`} AZT_{no} \underset{p-val = `r dummy1$p.value[3]`}{`r dummy1$estimate[3]`} RACE_{black}
 \end{equation}
 
 Controlling `raceblack`, we can say that `aztno` significantly affects aids `symptom`.
