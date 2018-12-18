@@ -1,0 +1,139 @@
+```{r, message=FALSE}
+library(tidyverse)
+```
+
+# Loglinear Models for Contingency Tables
+
+## Loglinear models for Two-way tables
+
+> Both variables are response variables.
+
+### Association between responses
+
+Consider $I \times J$ contingency table $\{ n_{ij} \}$. Then
+
+$$n_{ij} \sim Poisson(\mu_{ij})$$
+
+
+## Loglinear models for Three-way tables
+
+## Alcohol, cigarette, and marijuana use {-}
+
+```{r, message=FALSE}
+(substance <-
+  read_delim("data/Substance_use.dat", delim = " ") %>% 
+  mutate(alcohol = str_trim(alcohol))) # due to messy data file
+```
+
+To fit loglinear model, long data format like this is easy.
+
+```{r}
+substance <-
+  substance %>% 
+  mutate_if(is.character, factor) %>% 
+  mutate_if(is.factor, fct_rev)
+```
+
+Below is _mutual independence model_ `(A, C, M)`.
+
+```{r}
+(subs_log <-
+  substance %>% 
+  glm(count ~ alcohol + cigarettes + marijuana, data = ., family = poisson())) %>% 
+  summary()
+```
+
+### Fitted values
+
+```{r}
+fit_loglin <- function(x, ...) {
+  mod_name <-
+    as.character(x[[1]]$call)[2] %>% 
+    str_extract(pattern = "(?<=~).*") %>% 
+    str_trim()
+  x[[1]]$model %>% 
+    bind_cols(predict(x[[1]], newdata = ., type = "response", ...) %>% tbl_df()) %>% 
+    rename_at(.vars = vars(value), .funs = funs(return(mod_name)))
+}
+#--------------------------------
+(subs_fit <-
+  subs_hierarchy %>% 
+  map(fit_loglin) %>% 
+  plyr::join_all(by = c("count", "alcohol", "cigarettes", "marijuana"))) %>% 
+  pander::pander()
+```
+
+### Chi-square Goodness-of-fit tests
+
+$$G^2 = 2\sum n_{ijk}\ln\frac{n_{ijk}}{\hat\mu_{ijk}}$$
+
+$$X^2 = \sum\frac{(n_{ijk} - \hat\mu_{ijk})^2}{\hat\mu_{ijk}}$$
+
+with
+
+$$\text{residual df} = \text{the number of cell counts} - \text{the number of non-redundant parameters}$$
+
+```{r}
+subs_hierarchy <-
+  substance %>% 
+  do(
+    indep = glm(count ~ alcohol + cigarettes + marijuana, data = ., family = poisson()),
+    ac_m = glm(count ~ alcohol + cigarettes + marijuana + alcohol:cigarettes, 
+               data = ., family = poisson()),
+    amcm = glm(count ~ alcohol + cigarettes + marijuana + alcohol:marijuana + cigarettes:marijuana, 
+               data = ., family = poisson()),
+    acamcm = glm(count ~ alcohol + cigarettes + marijuana + alcohol:cigarettes + alcohol:marijuana + cigarettes:marijuana, 
+               data = ., family = poisson()),
+    acm = glm(count ~ alcohol * cigarettes * marijuana, 
+                 data = ., family = poisson())
+  )
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+good_loglin <- function(x, test = "LRT", ...) {
+  mod_name <-
+    as.character(x[[1]]$call)[2] %>% 
+    str_extract(pattern = "(?<=~).*") %>% 
+    str_trim()
+  broom::tidy(anova(x[[1]], test = test, ...)) %>% 
+    slice(n()) %>% 
+    add_column(model = mod_name, .before = 1) %>% 
+    select(-term)
+}
+#-----------------------------------------------
+(subs_good <-
+  subs_hierarchy %>% 
+  map(good_loglin, test = "LRT") %>% 
+  bind_rows()) %>% 
+  pander::pander()
+```
+
+From above $G^2$, we compare reduced model to complex model
+
+$$G^2(M_0 \mid M_1) = G^2(M_0) - G^2(M_1) \approx \chi^2\Big(df = df(M_0) - df(M_1)\Big)$$
+
+```{r}
+subs_good %>% 
+  select(-Deviance, -p.value) %>% 
+  rename(alternative = model) %>% 
+  mutate(goodness = c(Resid..Dev[1], -diff(Resid..Dev)),
+         df_good = c(Resid..Df[1], -diff(Resid..Df))) %>% 
+  mutate(p_value = pchisq(goodness, df = df_good, lower.tail = FALSE)) %>% 
+  pander::pander()
+```
+
+1. saturated model `(ACM)`: cannot reject $M_0$, so we choose next model
+2. three factor interaction `(AC,AM,CM)`: reject $M_0$
+
+Thus, we use model _(AC, AM, CM)_.
+
+
+
+
+
+
+
+
+
+

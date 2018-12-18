@@ -1,8 +1,17 @@
 new_session: yes
 
-rmd_files: {
-  "index.Rmd",
-	"generalized-linear-models.Rmd"
-}
+rmd_files: [
+  "index.rmd",
+
+  "generalized-linear-models.Rmd",
+  "poisson-regression.Rmd",
+
+  "logistic-regression.Rmd",
+  "logit-model-dummy.Rmd",
+
+  "multinomial-response.Rmd",
+
+  "loglinear-model.Rmd"
+]
 
 before_chapter_script: "_common.R"

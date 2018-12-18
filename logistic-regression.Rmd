@@ -1,8 +1,8 @@
 ```{r, message=FALSE}
 library(tidyverse)
-library(knitr)
-library(kableExtra)
-library(formattable)
+# library(knitr)
+# library(kableExtra)
+# library(formattable)
 ```
 
 # Logistic Regression
@@ -10,10 +10,10 @@ library(formattable)
 ## Horseshoe crab data
 
 ```{r, message=FALSE}
-crab <- read_table("data/Crabs.dat")
+(crab <- read_table("data/Crabs.dat"))
 ```
 
-```{r}
+```{r, eval=FALSE}
 crab %>% 
   mutate(
     sat = color_tile("white", "red")(sat),
@@ -30,7 +30,7 @@ crab %>%
     )
   ) %>% 
   head() %>% 
-  kable(format = "html", escape = FALSE,
+  kable(format = "latex", escape = FALSE,
         col.names = c("crab", "Satellites", "y", "Weight(kg)", "carapace width(cm)", "Color", "spine condition")) %>% 
   kable_styling("hover")
 ```
@@ -41,19 +41,29 @@ $$y_i = \begin{cases} 1 & \text{crab}\: i \:\text{has at least one satellite} \\
 
 Looking at the above data set in the eye, large width can help the crab have satellites. Let's check it out.
 
-```{r}
+```{r crabscat, fig.cap=fig$cap("crabscat", "Number of satellites by width of female crab")}
 crab %>% 
   ggplot() +
   aes(width, sat) +
-  geom_hex(show.legend = FALSE)
+  geom_hex() +
+  labs(
+    x = "Width",
+    y = "Number of Satellite"
+  )
 ```
 
-```{r}
+large variability.
+
+```{r crabdist, fig.cap=fig$cap("crabdist", "Distribution of satellites by width of female crab")}
 crab %>% 
   group_by(width_cut = cut(width, 8, ordered_result = TRUE)) %>%
   ggplot() +
   aes(width_cut, sat) +
-  geom_boxplot()
+  geom_boxplot() +
+  labs(
+    x = "Levels of width",
+    y = "Number of Satellite"
+  )
 ```
 
 ## Inference for logistic regression
@@ -86,58 +96,112 @@ broom::tidy(width_fit) %>%
   pander::pander()
 ```
 
+
 ### Likelihood ratio test
 
 $$G^2 = -2(L_0 - L_1)$$
 
 ```{r}
-anova(width_fit, test = "LRT")
+(width_lr <- anova(width_fit, test = "LRT"))
 ```
 
 ### Score test
 
-Note that
+With dispersion of 1, we have
 
-$$
-\begin{equation}
-\begin{split}
-l(\beta ; \mathbf{x}) & \propto \prod_{i = 1}^n \pi(x_i)^{y_i}(1 - \pi(x_i))^{n_i - y_i}\\
-& = \exp\biggl[\sum_{i = 1}^n y_i logit(\pi(x_i)) \biggl]\prod_{i = 1}^n(1 - \pi(x_i))^{n_i} \\
-& = \exp\biggl[\sum_{i = 1}^n y_i (\alpha + \beta x_i) \biggl]\prod_{i = 1}^n\biggl[\frac{1}{1 + \exp(\alpha + \beta x_i)}\biggr]^{n_i}
-\end{split}
-\end{equation}
-$$
+$$Var(Y_i) = V(\mu_i)$$
 
-Then
+and so
 
-$$
-L = \sum_{i = 1}^n y_i (\alpha + \beta x_i) - \sum_{i = 1}^n n_i \ln\Bigl[1 + \exp(\alpha + \beta x_i)\Bigr]
-$$
+$$X^2 = \sum_{i = 1}^n\frac{(y_i - \hat\mu_i)^2}{V(\hat\mu_i)}$$
 
-$$
-\begin{equation}
-\begin{split}
-S(y ; \beta) & = -\frac{\partial}{\partial\beta}L \\
-& = \sum_{i: y_i = 1} x_i - \sum_{i: y_i = 0} n_i\frac{\exp(\alpha + \beta x_i)}{1 + \exp(\alpha + \beta x_i)} \\
-& = \sum_{i: y_i = 1} x_i - \sum_{i: y_i = 0} n_i\pi(x_i)
-\end{split}
-\end{equation}
-$$
+```{r}
+(width_sc <- anova(width_fit, test = "Rao"))
+```
 
-$$
-\begin{equation}
-\begin{split}
-I(\beta) & := E\Bigl[S(y ; \beta)^2\Bigr] \\
-& = Var S(y ; \beta) \\
-& = 
-\end{split}
-\end{equation}
-$$
+In sum,
+
+```{r, echo=FALSE}
+wd_global <-
+  tribble(
+    ~test, ~chi,                 ~df,                ~pval,
+    #--------/----------------------/--------------/-----------------------/
+    "LRT",   width_lr$Deviance[2], width_lr$Df[2], width_lr$"Pr(>Chi)"[2],
+    "Score", width_sc$Rao[2],      width_sc$Df[2], width_sc$"Pr(>Chi)"[2]
+  )
+pander::pander(wd_global,
+               col.names = c("Test", "Chi-Square", "DF", "Pr > ChiSq"))
+```
+
+### Confidence interval for logit
+
+$Cov(\boldsymbol{\hat\beta})$ is given as
 
 ```{r}
 vcov(width_fit)
 ```
 
+Then
+
+$$Cov(\hat\alpha + \hat\beta x_0) = \left[\begin{array}{cc} 1 & x_0 \end{array}\right] Cov(\boldsymbol{\hat\beta})\left[\begin{array}{c} 1 \\ x_0 \end{array}\right] = Var(\hat\alpha) + x_0^2Var(\hat\beta) + 2x_0Cov(\hat\alpha, \hat\beta)$$
+
+For $x_0 = 26.5$, for instance,
+
+```{r}
+x0 <- c(1, 26.5)
+t(x0) %*% vcov(width_fit) %*% x0
+```
+
+Then we can calculate
+
+$$(\hat\alpha + \hat\beta x_0) + z_{\frac{\alpha}{2}} SE$$
+
+On the other hand, `predict.glm(se.fit = TRUE)` gives above value in `$se.fit` as _standard error_, i.e. squared value.
+
+```{r}
+data_frame(width = 26.5) %>% 
+  predict(width_fit, newdata = ., type = "link", se.fit = TRUE)
+```
+
+Interpolation:
+
+```{r}
+(width_logit <-
+  crab %>% 
+  bind_cols(predict(width_fit, newdata = ., type = "link", se.fit = TRUE) %>% tbl_df()) %>% 
+  select(sat, width, fit, se.fit) %>% 
+  mutate(
+    lower = fit - se.fit * qnorm(.25, lower.tail = FALSE),
+    upper = fit + se.fit * qnorm(.25, lower.tail = FALSE)
+  ))
+```
+
+### Inverse transformation
+
+Noting that
+
+$$\pi(x_0) = \frac{\exp(logit)}{1 + \exp(logit)}$$
+
+```{r}
+width_logit %>% 
+  transmute(
+    sat,
+    width,
+    lower = exp(lower) / (1 + exp(lower)),
+    upper = exp(upper) / (1 + exp(upper))
+  )
+```
+
+All at once: `type = "response"`
+
+```{r}
+predict(width_fit, type = "response", se.fit = TRUE) %>% 
+  tbl_df() %>% 
+  mutate(
+    lower = fit - se.fit * qnorm(.25, lower.tail = FALSE),
+    upper = fit + se.fit * qnorm(.25, lower.tail = FALSE)
+  )
+```
 
 ## Goodness of fit
 
@@ -145,36 +209,39 @@ vcov(width_fit)
 anova(width_fit, test = "Chisq")
 ```
 
+Consider more complex models: _quadtratic model with centered predictor_
 
 ```{r}
-center_fit <-
+width_comp <-
   crab %>% 
   mutate(width = width - mean(width)) %>% 
   select(y, width) %>% 
-  glm(y ~ ., data = ., family = binomial())
-quad_fit <- glm(y ~ poly(width, 2), data = crab, family = binomial())
+  do(
+    null_fit = glm(y ~ 1, data = ., family = binomial()),
+    center_fit = glm(y ~ ., data = ., family = binomial()),
+    quad_fit = glm(y ~ poly(width, 2), data = ., family = binomial())
+  )
 ```
 
 
 ```{r}
-anova(width_fit, center_fit, quad_fit, test = "Chisq")
+(quad_aov <-
+  anova(width_comp$null_fit[[1]],
+        width_comp$center_fit[[1]], 
+        width_comp$quad_fit[[1]], test = "LRT"))
 ```
 
-### Hosmer-Lemeshow goodness of fit
+Since quadratic model has $`r quad_aov$"Pr(>Chi)"[3]`$ of p-value, there is no evidence to support the model.
+
+## Hosmer-Lemeshow goodness of fit
 
 ```{r}
 MKmisc::HLgof.test(fit = fitted(width_fit), obs = crab$y, ngr = 8)
 ```
 
 ```{r}
-ResourceSelection::hoslem.test(crab$y, fitted(width_fit), g = 8)
+ResourceSelection::hoslem.test(crab$y, fitted(width_fit), g = 10)
 ```
-
-
-
-
-
-
 
 
 
