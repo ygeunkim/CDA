@@ -1,4 +1,5 @@
 bookdown::gitbook:
+  css: cda.css
   config:
     toc:
       collapse: section
@@ -8,12 +9,10 @@ bookdown::gitbook:
       link: https://github.com/ygeunkim/CDA/edit/master/%s
       text: "Edit"
     sharing: no
-  css: cda.css
-bookdown::html_chapters:
-  css: cda.css
 bookdown::pdf_book:
-  latex_engine: "xelatex"
+  includes:
+    in_header: preamble.tex
+  latex_engine: xelatex
   citation_package: natbib
-  pandoc_args: --top-level-division=chapter
-
-  
+  keep_tex: yes
+bookdown::epub_book: default

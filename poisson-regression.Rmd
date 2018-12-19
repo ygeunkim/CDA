@@ -1,9 +1,9 @@
-```{r, include=FALSE}
+# Generalized Linear Models for Counts and Rates
+
+```{r, message=FALSE}
 library(tidyverse)
 library(ggfortify)
 ```
-
-# Generalized Linear Models for Counts and Rates
 
 It is natural to assume the count data
 
@@ -313,20 +313,3 @@ data_frame(pred = predict(neg_fit, type = "response"),
 ```
 
 Compared to the poisson regression model, this model results in less variable residuals.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

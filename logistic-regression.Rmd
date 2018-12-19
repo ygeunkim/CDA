@@ -1,11 +1,11 @@
+# Logistic Regression
+
 ```{r, message=FALSE}
 library(tidyverse)
 # library(knitr)
 # library(kableExtra)
 # library(formattable)
 ```
-
-# Logistic Regression
 
 ## Horseshoe crab data
 
@@ -242,11 +242,3 @@ MKmisc::HLgof.test(fit = fitted(width_fit), obs = crab$y, ngr = 8)
 ```{r}
 ResourceSelection::hoslem.test(crab$y, fitted(width_fit), g = 10)
 ```
-
-
-
-
-
-
-
-

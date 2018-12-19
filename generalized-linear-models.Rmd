@@ -1,8 +1,8 @@
-```{r, include=FALSE}
+# Introduction to Generalized Linear Models
+
+```{r, message=FALSE}
 library(tidyverse)
 ```
-
-# Introduction to Generalized Linear Models
 
 ## Generalized Linear Models
 
@@ -89,7 +89,7 @@ snoring_score <- function(x) {
   }
   x
 }
-
+#-------------------------------------------
 (heart <-
   heart %>%
   rowwise() %>%
@@ -113,7 +113,7 @@ $$\pi(\mathbf{x}) = P(Y = \text{yes})$$
 (row_prop <- prop.table(heart_crosstab, margin = 1))
 ```
 
-```{r}
+```{r, warning=FALSE}
 (heart_prop <-
   heart %>%
   group_by(snoring) %>%
@@ -210,12 +210,6 @@ Denote that each row is observed `cases` times.
   summary())
 ```
 
-
-```{r}
-data.frame(LI = c(8, 26)) %>%
-  predict(remission_fit, newdata = ., type = "response")
-```
-
 ### `remission` raw data
 
 ```{r}
@@ -265,10 +259,3 @@ Thus, `glm` for `remissions ~ LI` for this raw data set gives the same result.
 ```{r}
 glm(remissions ~ LI, family = binomial(link = "logit"), data = remission_raw)
 ```
-
-
-
-
-
-
-

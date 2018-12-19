@@ -1,8 +1,8 @@
+# Loglinear Models for Contingency Tables
+
 ```{r, message=FALSE}
 library(tidyverse)
 ```
-
-# Loglinear Models for Contingency Tables
 
 ## Loglinear models for Two-way tables
 
@@ -41,26 +41,6 @@ Below is _mutual independence model_ `(A, C, M)`.
   substance %>% 
   glm(count ~ alcohol + cigarettes + marijuana, data = ., family = poisson())) %>% 
   summary()
-```
-
-### Fitted values
-
-```{r}
-fit_loglin <- function(x, ...) {
-  mod_name <-
-    as.character(x[[1]]$call)[2] %>% 
-    str_extract(pattern = "(?<=~).*") %>% 
-    str_trim()
-  x[[1]]$model %>% 
-    bind_cols(predict(x[[1]], newdata = ., type = "response", ...) %>% tbl_df()) %>% 
-    rename_at(.vars = vars(value), .funs = funs(return(mod_name)))
-}
-#--------------------------------
-(subs_fit <-
-  subs_hierarchy %>% 
-  map(fit_loglin) %>% 
-  plyr::join_all(by = c("count", "alcohol", "cigarettes", "marijuana"))) %>% 
-  pander::pander()
 ```
 
 ### Chi-square Goodness-of-fit tests
@@ -128,12 +108,22 @@ subs_good %>%
 
 Thus, we use model _(AC, AM, CM)_.
 
+### Fitted values
 
-
-
-
-
-
-
-
-
+```{r}
+fit_loglin <- function(x, ...) {
+  mod_name <-
+    as.character(x[[1]]$call)[2] %>% 
+    str_extract(pattern = "(?<=~).*") %>% 
+    str_trim()
+  x[[1]]$model %>% 
+    bind_cols(predict(x[[1]], newdata = ., type = "response", ...) %>% tbl_df()) %>% 
+    rename_at(.vars = vars(value), .funs = funs(return(mod_name)))
+}
+#--------------------------------
+(subs_fit <-
+  subs_hierarchy %>% 
+  map(fit_loglin) %>% 
+  plyr::join_all(by = c("count", "alcohol", "cigarettes", "marijuana"))) %>% 
+  pander::pander()
+```

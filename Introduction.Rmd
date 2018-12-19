@@ -42,7 +42,3 @@ L(\pi) & = \ln l(\pi) \\
 & = y\ln\pi + (n - y)\ln(1 - \pi)
 \end{split}
 \end{equation}
-
-
-
-

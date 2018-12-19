@@ -1,3 +1,5 @@
+# Multinomial Responses
+
 ```{r lib, message=FALSE}
 # wrangling data -------------------------------------
 library(tidyverse)
@@ -6,9 +8,18 @@ library(tidyverse)
 library(VGAM)
 # coloring tables -code will be hidden----------------
 library(formattable)
+# https://stackoverflow.com/questions/34983822/how-to-have-r-formattable-rendered-to-pdf-output-and-how-to-have-percents-in-the
+export_formattable <- function(f, file, background = "white", delay = 0.2, ...)
+{
+  w <- as.htmlwidget(f, ...)
+  path <- htmltools::html_print(w, background = background, viewer = NULL)
+  url <- paste0("file:///", gsub("\\\\", "/", normalizePath(path)))
+  webshot::webshot(url,
+          file = file,
+          selector = ".formattable_widget",
+          delay = delay)
+}
 ```
-
-# Multinomial Responses
 
 ## Nomial Response
 

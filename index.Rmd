@@ -1,34 +1,35 @@
 ---
+knit: "bookdown::render_book"
 title: "Categorical Data Analysis Lab"
 author: |
   | Young-geun Kim
-  | Department of Statistics, Sungkyunkwan university
+  | 2013310512, Department of Statistics
   | \href{mailto: dudrms33@g.skku.edu}{dudrms33@g.skku.edu}
 date: "`r format(Sys.time(), '%d %b, %Y')`"
-knit: "bookdown::render_book"
 bibliography: book.bib
-indent: yes
-numbersections: true
-lot: yes
-lof: yes
+biblio-style: apalike
+site: bookdown::bookdown_site
+description: "Conduct categorical data analysis with R"
 cover-image: cover.png
 documentclass: book
 header-includes:
 - \setlength{\parskip}{1em}
 - \setlength{\baselineskip}{1ex}
-- \usepackage{multirow}
-- \usepackage{float}
 ---
 
-# Categorical Data Analysis {-}
+# Categorical Data Analysis
 
 Study how to use `R` for categorical data in view of @Agresti:2012aa
 
-![](cdaagresti.jpeg)
+```{r, echo=FALSE}
+knitr::include_graphics("cdaagresti.jpeg")
+```
 
-# Software usage {-}
+## Software usage
 
-![R](rproject.png)
+```{r, echo=FALSE}
+knitr::include_graphics("rproject.png")
+```
 
 ```{r, echo=FALSE}
 R.version
@@ -36,9 +37,7 @@ R.version
 
 using IDE:
 
-![RStudio](rstudioicon.png)
-
 ```{r, echo=FALSE}
-rstudioapi::versionInfo()
+knitr::include_graphics("rstudioicon.png")
 ```
 

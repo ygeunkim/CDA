@@ -1,27 +1,8 @@
+# Logit Model for Qualitative Predictors
+
 ```{r, message=FALSE}
 library(tidyverse) # handling data
-library(knitr) # formatting tables
-library(kableExtra) # extra format -- multirow, xcolor, etc
 ```
-
-```{r, include=FALSE}
-# https://stackoverflow.com/questions/13848137/figure-captions-references-using-knitr-and-markdown-to-html
-fig <- local({
-    i <- 0
-    ref <- list()
-    list(
-        cap = function(refName, text) {
-            i <<- i + 1
-            ref[[refName]] <<- stringr::str_c("Figure ", i) # in the text
-            text # under the plot
-        },
-        ref = function(refName) {
-            ref[[refName]]
-        })
-})
-```
-
-# Logit Model for Qualitative Predictors
 
 ```{r, message=FALSE}
 aids <- read_table("data/AIDS.dat")
@@ -31,7 +12,7 @@ aids <- read_table("data/AIDS.dat")
 <!-- Option clash for package xcolor: problem of knitr/kableExtra?? -->
 <!-- works in Macbook pro 2013 late, but error in 2015 late: why?? -->
 
-```{r, echo=FALSE}
+```{r, eval=FALSE}
 aids %>% # https://haozhu233.github.io/kableExtra/awesome_table_in_html.html
   group_by(race) %>% 
   gather(yes, no, key = symptom, value = count, factor_key = TRUE) %>% # just to consider symptom columns at once
@@ -93,24 +74,28 @@ Then the model can be specified in ANOVA term.
 
 \begin{equation}
 \ln\frac{\pi_i}{1 - \pi_i} = \alpha + \beta_i, \: i = 1, 2, \ldots, I
+\label{eq:anovatype}
 \end{equation}
 
 For redunduncies, we add a constraint. Among the three, we can choose anything. We can set the frist term zero.
 
 \begin{equation}
 \beta_1 = 0
+\label{eq:dumfirst}
 \end{equation}
 
 Similarly, the last term can be set zero. Any other single $j$-term can be chosen.
 
 \begin{equation}
 \beta_I = 0
+\label{eq:dumlast}
 \end{equation}
 
 By setting the whole sum as zero, we can guarantee the uniqueness.
 
 \begin{equation}
 \sum_i \beta_i = 0
+\label{eq:eff}
 \end{equation}
 
 ### Two-way ANOVA representation
@@ -123,7 +108,7 @@ $$
 \ln\frac{\pi_i}{1 - \pi_i} = \alpha + \beta_i^X + \beta_k^Z, \quad i = 1, \ldots, I,\: j = 1, \ldots, I
 $$
 
-constraint to $\beta_i^X$ and $\beta_i^Z$ among `(2)-(4)`. This model induces the relationship between $Y$ and $X$ given $Z$, i.e. conditional dependence.
+constraint to $\beta_i^X$ and $\beta_i^Z$ among $\eqref{eq:dumfirst}$ - $\eqref{eq:eff}$. This model induces the relationship between $Y$ and $X$ given $Z$, i.e. conditional dependence.
 
 ## Indicator Variables
 
@@ -131,7 +116,7 @@ ANOVA-type model have presented various restrictions to allow parameters have no
 
 ### Dummy Coding
 
-From `(2)` or `(3)`, we can implement so-called _dummy coding_. For example, `(3)` results in
+From $\eqref{eq:dumfirst}$ or $\eqref{eq:dumlast}$, we can implement so-called _dummy coding_. For example, $\eqref{eq:dumlast}$ results in
 
 | |$x_1$|$x_2$|$\cdots$|$x_{I-1}$|  
 |:---:|:---:|:---:|:---:|:---:|  
@@ -186,16 +171,17 @@ This corresponds to
 
 $$logit\pi = \beta_1 - \beta_2 = 2\beta_1$$
 
-The log odds ratio becomes twice of dummy coding induced by `(3)`. In terms of model parameter estimates, it would be the half of the dummy coding.
+The log odds ratio becomes twice of dummy coding induced by $\eqref{eq:dumlast}$. In terms of model parameter estimates, it would be the half of the dummy coding.
 
 ## Linear Logit Model for Contingency Tables
 
 ### Ordering categories
 
-ANOVA-type model `(1)` is invariant to the factor-ordering.
+ANOVA-type model $\eqref{eq:dumfirst}$ is invariant to the factor-ordering.
 
 \begin{equation}
 logit(\pi_i) = \alpha + \beta x_i
+\label{eq:anovorder}
 \end{equation}
 
 ### Long data
@@ -226,7 +212,7 @@ This means that if we put `no` followed by `yes`, `glm()` will fit $P(AIDS = yes
   }))
 ```
 
-### Dummy Coding induce by `(2)`
+### Dummy Coding induce by \eqref{eq:dumfirst}
 
 By default, `base = 1` is used.
 
@@ -261,11 +247,12 @@ dummy1 <- broom::tidy(dummy_first)
 
 \begin{equation}
 logit(\hat\pi) = `r dummy1$estimate[1]`  \underset{p-val = `r dummy1$p.value[2]`}{`r dummy1$estimate[2]`} AZT_{no} \underset{p-val = `r dummy1$p.value[3]`}{`r dummy1$estimate[3]`} RACE_{black}
+\label{eq:dumfirstfit}
 \end{equation}
 
 Controlling `raceblack`, we can say that `aztno` significantly affects aids `symptom`.
 
-### Dummy Coding induced by `(3)`
+### Dummy Coding induced by \eqref{eq:dumlast}
 
 By changing the dataset, we can freely implement the other qualitative coding. We now try `contr.treatment(base = 2)`, i.e. setting the last term zero.
 
@@ -307,6 +294,7 @@ dummy_last$contrasts
 
 \begin{equation}
 logit(\hat\pi) = -1.0736 - \underset{p-val = 0.0099}{0.7195} AZT_{yes} + \underset{p-val = 0.8476}{0.0555} RACE_{white}
+\label{eq:dumlastfit}
 \end{equation}
 
 As mentioned, the absolute values of the estimates are exactly same. The only differences are _their signs_ by changing the definition of their variables.
@@ -341,13 +329,14 @@ effect_sum$contrasts
 
 \begin{equation}
 logit(\hat\pi) = -1.4056 - \underset{p-val = 0.01}{0.36} AZT_{effect} - \underset{p-val = 0.8476}{0.0277} RACE_{effect}
+\label{eq:efffit}
 \end{equation}
 
 ```{r, echo=FALSE}
 round(coef(effect_sum), 3) == round(coef(dummy_last) / 2, 3)
 ```
 
-We can see the both $\beta_1$ and $\beta_2$ of `(8)` are half of the model `(7)`.
+We can see the both $\beta_1$ and $\beta_2$ of $\eqref{eq:efffit}$ are half of the model $\eqref{eq:dumlastfit}$.
 
 ## Confidence Intervals
 
@@ -445,7 +434,7 @@ pred_prob %>%
 
 In sum,
 
-```{r, echo=FALSE}
+```{r, eval=FALSE}
 pred_prob %>% 
   mutate(yes_fit = round((yes + no) * pred_prob, digits = 1),
          no_fit = round((yes + no) * (1 - pred_prob), digits = 1),
@@ -487,11 +476,3 @@ aids %>%
   mutate(Sum = yes + no) %>% 
   glm(yes/Sum ~ azt + race, data = ., weights = Sum, family = binomial())
 ```
-
-
-
-
-
-
-
-

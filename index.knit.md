@@ -1,35 +1,28 @@
 
 ---
-title: "Categorical Data Analysis Lab"
-author: |
-  | Young-geun Kim
-  | Department of Statistics, Sungkyunkwan university
-  | \href{mailto: dudrms33@g.skku.edu}{dudrms33@g.skku.edu}
-date: "18 Dec, 2018"
 knit: "bookdown::render_book"
+title: "Categorical Data Analysis Lab"
+author: "Young-geun Kim"
+date: "19 Dec, 2018"
 bibliography: book.bib
-indent: yes
-numbersections: true
-lot: yes
-lof: yes
-cover-image: cover.png
+biblio-style: apalike
+# numbersections: yes
+site: bookdown::bookdown_site
+description: "categorical data analysis with R"
 documentclass: book
-header-includes:
-- \setlength{\parskip}{1em}
-- \setlength{\baselineskip}{1ex}
-- \usepackage{multirow}
-- \usepackage{float}
 ---
 
-# Categorical Data Analysis {-}
+# Categorical Data Analysis
 
 Study how to use `R` for categorical data in view of @Agresti:2012aa
 
-![](cdaagresti.jpeg)
 
-# Software usage {-}
+\begin{center}\includegraphics[width=0.7\linewidth]{cdaagresti} \end{center}
 
-![R](rproject.png)
+## Software usage
+
+
+\begin{center}\includegraphics[width=0.7\linewidth]{rproject} \end{center}
 
 
 ```
@@ -52,7 +45,7 @@ nickname       Feather Spray
 
 using IDE:
 
-![RStudio](rstudioicon.png)
 
+\begin{center}\includegraphics[width=0.7\linewidth]{rstudioicon} \end{center}
 
 
