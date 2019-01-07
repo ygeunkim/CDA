@@ -4,6 +4,7 @@ rmd_files: [
 
   "generalized-linear-models.Rmd",
   "poisson-regression.Rmd",
+  "poisson-rate.Rmd"
 
   "logistic-regression.Rmd",
   "logit-model-dummy.Rmd",

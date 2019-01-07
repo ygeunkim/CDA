@@ -1,0 +1,557 @@
+# Poisson Regression for rates
+
+## Aircraft Accidents per 100,000 Flight hours {-}
+
+
+```{r, message=FALSE}
+library(tidyverse)
+```
+
+### Accidents and Fatalities
+
+from @datagov
+
+```{r, message=FALSE, warning=FALSE}
+flight <-
+  read_csv("data/table10_2014.csv",
+           skip = 7,
+           col_names = c(
+             "year", "accidents_all", "accidents_fatal",
+             "fatalities_total", "fatalities_aboard", "flight_hours",
+             "acc_per_mill_all", "acc_per_mill_fatal"
+             ),
+           n_max = 38, na = "-"
+           )
+```
+
+```{r, echo=FALSE}
+flight
+```
+
+@datalink explains about above variables that @datagov had defined accidents as
+
+- damage
+- injury
+- serious
+- major
+
+Major accident is ocurred when a Part 121 aircraft was destroyed, was substantially damaged, or any aircraft faced one or more fatalities. The other accidents are defined by these conditions. Here, our target is accidents count. We wonder that _the number of accidents is decreasing as time goes_. In this data set, however, we can see the other index. Accidents can get increasing as the flight hours become longer. @datagov mentions that `year` of `2014` observation is preliminary set. It would not be used in fitting the models. We might predict for `year = 2014` and compare to this observation.
+
+```{r}
+flight14 <-
+  flight %>%
+  filter(year != 2014)
+```
+
+
+```{r acc_hour, fig.cap=fig$cap("acc_hour", "Relationship between Total accidents and Flight hours")}
+flight14 %>%
+  ggplot(aes(flight_hours, accidents_all)) +
+  geom_point(na.rm = TRUE) +
+  labs(x = "Flight hours", y = "Total accidents")
+```
+
+### flight hours
+
+_Federal Aviation Adminitration_ had estimated the flight hours.
+
+```{r hour_year, fig.cap=fig$cap("hour_year", "Trend of flight hours by year")}
+flight14 %>%
+  ggplot(aes(x = year, y = flight_hours)) +
+  geom_line() +
+  labs(x = "Flight year", y = "Flight hours")
+```
+
+`r fig$ref("hour_year")` shows that flight has been shorter and shorter as time passed. Note that `2011` estimates is missing.
+
+### Accidents and Fatalities
+
+Here _accidents_ and _fatalities_ literally mean ones occurred in flights. In case of counting variable - `accident_` and `fatalities_` - suicide, sabotage, and stolen/unauthorized aircraft cases are also included. These kinds of cases are not included in rate variable in the given data set - `acc_per_mill_all_`, which mean accidents per 100,000 flight hours. Also, there is _fatal accident_.
+
+In this analysis, we focus on the _total accident_, not the fatalties nor the _fatal accidents_.
+
+```{r acc_box, fig.cap=fig$cap("acc_box", "Distribution of total accidents by flight hours")}
+flight14 %>%
+  na.omit() %>%
+  group_by(ft = cut(flight_hours, 8)) %>%
+  ggplot(aes(x = ft, y = accidents_all)) +
+  geom_boxplot(aes(fill = ft), col = "#f0650e", alpha = .5, show.legend = FALSE) +
+  labs(x = "Flight hours", y = "Total Accidents") +
+  theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust = 1))
+```
+
+From `r fig$ref("acc_box")` we state that as the flight is in the sky longer, the accident tends to happen more frequently. It should be considered as _offset_.
+
+### Accidents per 100,000 flight hours
+
+```{r}
+flight_reduced <-
+  flight14 %>%
+  na.omit() %>%
+  select(year, flight_hours, accidents_all)
+```
+
+As mentioned, given rate variable might not have same cases as count variables. So here we make new variable. Since we should have computed rate based on the flight hours, we just remove the missing value.
+
+```{r}
+(flight_reduced <-
+  flight_reduced %>%
+  mutate(acc_rate = accidents_all / flight_hours * 100000))
+```
+
+
+```{r rate_year, fig.cap=fig$cap("rate_year", "Total accidents per 100000 flight hours")}
+flight_reduced %>%
+  ggplot(aes(x = year, y = acc_rate)) +
+  geom_line() +
+  labs(x = "Flight year", y = "Accident rate")
+```
+
+We can see from `r fig$ref("rate_year")` the negative relationship between flight year and accident rate. For clarity,
+
+```{r}
+flight_reduced %>%
+  group_by(flight_hours = cut(flight_hours, 3)) %>%
+  summarise(
+    cases = n(),
+    num_acc = sum(accidents_all),
+    sample_mean = mean(accidents_all),
+    sample_variance = var(accidents_all)
+  )
+```
+
+`sample_variance` are far larger than `sample_mean`. In other words, _overdispersion_ for `accidents_all` $\sim Poisson$ has happened. As already seen, flight hour can be adjusted.
+
+## Poisson Regression for Rates
+
+Consider _Poisson regression_ model. Here total accident count is our response variable $Y_i$, and flight hour $t_i$ can be an index. Write
+
+$$\mu_i := E(Y_i)$$
+
+Then the Poisson regression model for $\frac{y_i}{t_i}$ is
+
+\begin{equation}
+\ln\frac{\mu_i}{t_i} = \alpha + \beta x_i
+\end{equation}
+
+This `(1)` has equivalent to
+
+\begin{equation}
+\ln\mu_i - \ln{t_i} = \alpha + \beta x_i
+\end{equation}
+
+and the term
+
+$$-\ln{t_i}$$
+
+is called _offset_. In `R`, `log(flight_hours/100000)` is the `offset` of the `glm()`. Also, `(1)` and `(2)` are equivalent to
+
+\begin{equation}
+\mu_i = t_i\exp(\alpha + \beta x_i)
+\end{equation}
+
+From `(3)`, the interpretation of the model can be induced that $\mu_i$ is _proportional to_ $t_i$[@Agresti:2013aa]
+
+### Estimation
+
+```{r}
+rate_fit <-
+  flight_reduced %>%
+  glm(accidents_all ~ year, offset = log(flight_hours/100000),
+      family = poisson(link = "log"), data = .)
+```
+
+
+```{r}
+summary(rate_fit)
+```
+
+Thus,
+
+\begin{equation}
+\ln\hat\mu - \ln{t} = 41.36 -\underset{\stackrel{ASE = 0.0003}{p-value < 2\cdot10^{16}}}{0.02}x
+\end{equation}
+
+We reject $H_0: \beta = 0$, so the relationship can be said to be significant.
+
+### Estimated rate
+
+The _estimated rate_ can be estimated as
+
+$$\exp(\hat\alpha + \hat\beta x) = \exp(41.36 -0.02x)$$
+
+For each year,
+
+```{r}
+year_mat <-
+  flight_reduced %>%
+  mutate(intercept = 1) %>%
+  select(intercept, year) %>%
+  as.matrix()
+rate_est <- exp(coef(rate_fit) %*% t(year_mat))
+colnames(rate_est) <- flight_reduced %>% select(year) %>% pull()
+rate_est
+```
+
+For example, the estimated accident rate decreases from `12` in `1975` to `5.68` in `2013`.
+
+### Goodness-of-fit
+
+Consider _scaled deviance_[@Agresti:2013aa].
+
+\begin{equation}
+\frac{D(\mathbf{y}, \boldsymbol{\hat\mu})}{\phi} \approx \chi^2
+\end{equation}
+
+where the _deviance_ of the exponential family is
+
+\begin{equation}
+\begin{split}
+D & := -2(L_M - L_S) \\
+& = LRT \quad\text{for}\:H_0: M \\
+& = 2\sum_i\frac{y_i\tilde\theta_i - b(\tilde\theta_i)}{a(\phi)} - 2\sum_i\frac{y_i\hat\theta_i - b(\hat\theta_i)}{a(\phi)} \qquad, \tilde\theta = \text{of saturated model},\: \hat\theta = \text{of the current model}
+\end{split}
+\end{equation}
+
+and $a_i(\phi) = \frac{\phi}{w_i}$.
+
+For Poisson GLMs, the deviance simplifies to
+
+$$D(\mathbf{y}, \boldsymbol{\hat\mu}) = 2\sum_i \ln(\frac{y_i}{\hat\mu_i})$$
+
+To measure the goodness-of-fit, we perform _analysis of deviance_[@McCullagh:1989aa]. Comparing two models with $\phi = 1$,
+
+$$M_0: \text{simpler model} \qquad\text{vs}\qquad M_1: \text{complex model}$$
+
+where $M_0$ is _nested_ within $M_1$. For each model, we obtain
+$$D_0 \equiv D(\mathbf{y}, \boldsymbol{\hat\mu_0}) \le D_1 \equiv D(\mathbf{y, \boldsymbol{\hat\mu_1}})$$
+
+Then the analysis of deviance conduct LRT for the above test with
+
+$$G^2(M_0 \mid M_1) \equiv D_0 - D_1 \stackrel{H_0}{\approx} \chi^2(\text{difference of parameters})$$
+
+For GLMs using canonical link, the test statistic also can be simplified[@Agresti:2013aa].
+
+$$G^2(M_0 \mid M_1) = 2\sum_i\hat\mu_{1i}\ln\frac{\hat\mu_{1i}}{\hat\mu_{0i}}$$
+
+```{r}
+anova(rate_fit, test = "LRT")
+```
+
+Note that `Pr(>Chi)` indicates the p-value for
+
+$$H_0: \text{null model} \qquad\text{vs}\qquad H_1: \text{include year}$$
+
+$H_0$ can be rejected. We conclude that the _Poisson regression model can be used_.
+
+### Residual analysis
+
+Consider standardized Pearson residual
+
+\begin{equation}
+r_i = \frac{y_i - \hat\mu_i}{\sqrt{V(\hat\mu_i)(1 - \hat{h}_i)}} = \frac{e_i}{\sqrt{V(\hat\mu_i)(1 - \hat{h}_i)}}
+\end{equation}
+
+so that
+
+$$r_i \stackrel{\text{large}\:\mu_i}{\approx} N(0, 1)$$
+
+```{r pois_box, fig.cap=fig$cap("pois_box", "Box plot for Poisson regression residual")}
+std_pearson <- rstandard(rate_fit, type = "pearson")
+names(std_pearson) <- flight_reduced$year
+tibble(std_pearson) %>%
+  ggplot(aes(y = std_pearson)) +
+  geom_boxplot() +
+  coord_flip() +
+  ylab("Standardized pearson residuals")
+```
+
+From `r fig$ref("pois_box")`, residuals have large values though standardized.
+
+```{r pois_resid, fig.cap=fig$cap("pois_resid", "Q-Q plot for Poisson regression residual")}
+tibble(std_pearson) %>%
+  ggplot() +
+  aes(sample = std_pearson) +
+  geom_qq_line(col = "grey", size = 1.5) +
+  geom_qq() +
+  labs(x = "Theoretical quantiles",
+       y = "Standardized pearson residuals")
+```
+
+Normal Q-Q plot in `r fig$ref("pois_resid")` seems reasonable, though some of the points are out of the line.
+
+```{r pois_diag, fig.cap=fig$cap("pois_diag", "Residual plot for Poisson regression")}
+data_frame(pred = predict(rate_fit),
+         resid = std_pearson) %>%
+  ggplot() +
+  aes(pred, resid) +
+  geom_hline(yintercept = 0, alpha = .5) +
+  geom_jitter() +
+  labs(x = "Predicted response",
+       y = "Standardized pearson residuals")
+```
+
+_Heterogeneity_ is observed in `r fig$ref("pois_diag")`. In the perspective of systematic component, we are able to catch an ambiguous _nonliearity_ pattern.
+
+## Negative Binomial GLMs
+
+Consider random component of
+
+$$Y \sim Negbin(k, \mu)$$
+
+with
+
+$$E(Y) = \mu \qquad\text{and}\quad Var(Y) = \mu + \frac{\mu^2}{k}$$
+
+Then we can build generalized linear model with _negative binomial random component_.
+
+### Identity link
+
+For negative binomail response, here we try _identity link function_.
+
+```{r}
+rate_neg_fit <-
+  flight_reduced %>%
+  glm(accidents_all ~ year,
+      family = MASS::negative.binomial(theta = 1, link = "identity"), data = .)
+```
+
+```{r}
+summary(rate_neg_fit)
+```
+
+### Estimation
+
+The model is estimated as
+
+\begin{equation}
+\hat\mu = 124253.47 -\underset{\stackrel{ASE = 3.83}{p-value < 2\cdot10^{16}}}{61.15}x
+\end{equation}
+
+As one year passes, the number of flight accidents decreases by $-\hat\beta = 61.15$. In other words, flight year has an _additive impact_ of `-61.15` on the total accidents.
+
+### Goodness-of fit
+
+```{r}
+anova(rate_neg_fit, test = "LRT")
+```
+
+Similarly, $H_0: \text{null model}$ is rejected. We can said that this model explains the data set.
+
+### Residual analysis
+
+Again computing `(7)` for this model,
+
+```{r neg_box, fig.cap=fig$cap("neg_box", "Box plot for Negative binomial regression residual")}
+std_pearson_neg <- rstandard(rate_neg_fit, type = "pearson")
+names(std_pearson_neg) <- flight_reduced$year
+tibble(std_pearson_neg) %>%
+  ggplot(aes(y = std_pearson_neg)) +
+  geom_boxplot() +
+  coord_flip() +
+  ylab("Standardized pearson residuals")
+```
+
+Look at the `r fig$ref("neg_box")`. Compared to the above Poisson fit, we can get the small residuals.
+
+```{r neg_resid, fig.cap=fig$cap("neg_resid", "identity link negative binomial regression: Q-Q plot")}
+tibble(std_pearson_neg) %>%
+  ggplot() +
+  aes(sample = std_pearson_neg) +
+  geom_qq_line(col = "grey", size = 1.5) +
+  geom_qq() +
+  labs(x = "Theoretical quantiles",
+       y = "Standardized pearson residuals")
+```
+
+`r fig$ref("neg_resid")` is likely to be acceptable.
+
+```{r neg_diag, fig.cap=fig$cap("neg_diag", "Residual plot for Negative binomial regression")}
+data_frame(pred = predict(rate_neg_fit),
+         resid = std_pearson_neg) %>%
+  ggplot() +
+  aes(pred, resid) +
+  geom_hline(yintercept = 0, alpha = .5) +
+  geom_jitter() +
+  labs(x = "Predicted response",
+       y = "Standardized pearson residuals")
+```
+
+In `r fig$ref("neg_diag")`, heterogeneity has been improved upon `r fig$ref("pois_diag")`. However, Nonlinearity for systematic component is arised. It is different from this model assumption. Recall that _identity link_ is not preferred in analysis of this kind of response. Such misleading pattern is due to the wrong setting for _link function_. We now consider _log link_, which is more typical.
+
+### log link with offset
+
+We try to implement _offset term and log link_ to negative binomial response.
+
+```{r}
+rate_neg_log_fit <-
+  flight_reduced %>%
+  glm(accidents_all ~ year, offset = log(flight_hours/100000),
+      family = MASS::negative.binomial(theta = 1, link = "log"), data = .)
+```
+
+```{r}
+summary(rate_neg_log_fit)
+```
+
+### Estimation
+
+\begin{equation}
+\ln\hat\mu - \ln{t} = 38.59 -\underset{\stackrel{ASE = 0.001}{p-value < 6.94\cdot10^{16}}}{0.02}x
+\end{equation}
+
+### Estimated rate
+
+As in Poisson regression, we can estimate the rate.
+
+$$\exp(\hat\alpha + \hat\beta x) = \exp(38.59 -0.02x)$$
+
+```{r}
+rate_neg_est <- exp(coef(rate_neg_log_fit) %*% t(year_mat))
+colnames(rate_neg_est) <- flight_reduced %>% select(year) %>% pull()
+rate_neg_est
+```
+
+In the same perspective, the estimated accident rate decreases from `11.78` in `1975` to `5.88` in `2013`.
+
+### Goodness-of-fit
+
+```{r}
+anova(rate_neg_log_fit, test = "LRT")
+```
+
+In view of nested model, $H_0$ is rejected. In other words, the model fits well.
+
+### Residual analysis
+
+```{r log_box, fig.cap=fig$cap("log_box", "Box plot for Negative binomial log regression residual")}
+std_pearson_neg_log <- rstandard(rate_neg_log_fit, type = "pearson")
+names(std_pearson_neg_log) <- flight_reduced$year
+tibble(std_pearson_neg_log) %>%
+  ggplot(aes(y = std_pearson_neg_log)) +
+  geom_boxplot() +
+  coord_flip() +
+  ylab("Standardized pearson residuals")
+```
+
+`r fig$ref("log_box")` also shows small standardized residuals, which is reasonable to follow $N(0, 1)$
+
+```{r log_resid, fig.cap=fig$cap("log_resid", "identity link negative binomial log regression: Q-Q plot")}
+tibble(std_pearson_neg_log) %>%
+  ggplot() +
+  aes(sample = std_pearson_neg_log) +
+  geom_qq_line(col = "grey", size = 1.5) +
+  geom_qq() +
+  labs(x = "Theoretical quantiles",
+       y = "Standardized pearson residuals")
+```
+
+The centre part of `r fig$ref("log_resid")` seems the closest to the straight line, but all three are almost same pattern.
+
+```{r log_diag, fig.cap=fig$cap("log_diag", "Residual plot for Negative binomial log regression")}
+data_frame(pred = predict(rate_neg_log_fit),
+         resid = std_pearson_neg_log) %>%
+  ggplot() +
+  aes(pred, resid) +
+  geom_hline(yintercept = 0, alpha = .5) +
+  geom_jitter() +
+  labs(x = "Predicted response",
+       y = "Standardized pearson residuals")
+```
+
+The pattern of `r fig$ref("log_diag")` seems not that different from that of `r fig$ref("pois_diag")` from Poisson regression. Just notice that scale of this `y` axis is much smaller. This negative binomial model has improved the fit on the Poisson. This model fit might be more acceptable than the others in terms of pearson residuals.
+
+## Prediction
+
+### Year of `2014`
+
+As mentioned earlier, we now predict the total accidents at year of `2014`.
+
+```{r}
+newdat <-
+  flight %>%
+  filter(year == 2014)
+```
+
+```{r}
+# poisson
+pois_pred <-
+  newdat %>%
+  predict(rate_fit, newdata = ., type = "response")
+# negative binomial
+neg_pred <-
+  newdat %>%
+  predict(rate_neg_fit, newdata = ., type = "response")
+# negbinom with log link
+neg_log_pred <-
+  newdat %>%
+  predict(rate_neg_log_fit, newdata = ., type = "response")
+```
+
+For each model, we get the following predicted value.
+
+```{r, echo=FALSE}
+bind_rows(pois_pred,
+          neg_pred,
+          neg_log_pred) %>%
+  rename(total_accidents = "1") %>%
+  add_column(Model = c("Poisson", "Negbinom", "Negbinom with log"), .before = 1) %>%
+  mutate(sqrt_RSS = sqrt((total_accidents - newdat$accidents_all)^2)) %>%
+  pander::pander()
+```
+
+For `year = 2014`, identity link for negative binomial gives the smallest residual sum of squares. However, since this prediction has done for only one point, this result is not that credible.
+
+### Predictive power
+
+For summarizing predictive power, _correlation_ between $y_i$ and $\hat\mu_i$ can be used.
+
+$$R \equiv R(\mathbf{y}, \boldsymbol{\hat\mu})$$
+
+```{r}
+(pred_power <-
+  flight_reduced %>%
+  summarise(poisson = cor(accidents_all, fitted(rate_fit)),
+            negbinom = cor(accidents_all, fitted(rate_neg_fit)),
+            negbinom_log = cor(accidents_all, fitted(rate_neg_log_fit))))
+```
+
+In terms of predicive power measured by $R$, Poisson regression performs the best among the three models.
+
+## Conclusion
+
+The goal was to find relationship between the number of total aircraft accidents and year. Since the accidents can occur more time as the flight hours get longer, their rate variable have been also considered. For this data set, we have tried three types of GLMs:
+
+- Poisson regression with log link for rate
+- Negative binomial regression with identity link
+- Negative binomial regression with log link for rate
+
+and was estimated by
+
+$$\ln\hat\mu - \ln{t} = 41.36 -\underset{\stackrel{ASE = 0.0003}{p-value < 2\cdot10^{16}}}{0.01968}x$$
+
+$$\hat\mu = 124253.47 -\underset{\stackrel{ASE = 3.83}{p-value < 2\cdot10^{16}}}{61.15}x$$
+
+$$\ln\hat\mu - \ln{t} = 38.59 -\underset{\stackrel{ASE = 0.001}{p-value < 6.94\cdot10^{16}}}{0.01829}x$$
+
+Poisson regression and negative binomial regression with log link have almost same $\beta$ estimates. Their difference comes from standard error and intercept term. Denote that every $\hat\beta$ is negative. As `1` year passes, $\mu$ would decrease. For identity link, the change is additive. For log link, the first and third ones, the change is multiplicative on $\mu$.
+
+All were able to explain the data set significantly, in view of deviance. We have tried two different link functions for negative binomial random component model. Commonly, both models result in small deviance. To summarize,
+
+```{r, echo=FALSE}
+RATE <- unlist(lapply(list(rate_fit, rate_neg_fit, rate_neg_log_fit), deviance))
+names(RATE) <- c(
+  "Poisson with offset",
+  "Negbinom with identity",
+  "Negbinom with offset, log"
+)
+pander::pander(RATE)
+```
+
+However, _residual diagnostics_ have shown that the identity link cannot capture the nonlinear relationship. `r fig$ref("neg_diag")` has obvious nonlinear pattern compared to the other `r fig$ref("pois_ref")` and `r fig$ref("log_diag")`. As a result, we can conclude that _log link for negative binomial GLM_ has performed the best for this dataset in goodness-of-fit. Poisson regression gives large deivance, while negative binomial models small. In predictive power perspective, howerver, Poisson regression also gives a good result.
+
+```{r, echo=FALSE}
+pander::pander(pred_power)
+```
+
+In fact, Poisson regression produces larger correlation than the other models.
